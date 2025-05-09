@@ -119,9 +119,8 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ products }) => {
                   startContent={<Icon icon="lucide:shopping-cart" />}
                   className="flex-1"
                   onPress={() => { 
-                    const phone = "+6283824723739"; // Ganti dengan nomor WA tujuan (format internasional tanpa +)
                     const text = product.text;
-                    const url = `https://wa.me/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}`;
+                    const url = `https://wa.me/send?phone=6283824723739&text=${encodeURIComponent(text)}`;
                     window.open(url, "_blank");}}
                 >
                   Beli Sekarang
