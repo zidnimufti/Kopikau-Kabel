@@ -120,7 +120,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ products }) => {
                   className="flex-1"
                   onPress={() => { 
                     const text = product.text;
-                    const url = `https://wa.me/send?phone=6283824723739&text=${encodeURIComponent(text)}`;
+                    const url = `https://api.whatsapp.com/send/?phone=%2B6283824723739&text=${encodeURIComponent(text)}`;
                     window.open(url, "_blank");}}
                 >
                   Beli Sekarang
