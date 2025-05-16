@@ -1,7 +1,9 @@
 import React from "react";
-import { Card, CardBody, CardFooter, Chip } from "@heroui/react";
+import { Card, CardBody, CardFooter, Chip, Button } from "@heroui/react";
 import { Product } from "../types/product";
 import { useNavigate } from "react-router-dom";
+import { useCart } from "../components/CartContext";
+import { Icon } from "@iconify/react";
 
 interface ProductGridProps {
   products: Product[];
@@ -9,9 +11,14 @@ interface ProductGridProps {
 
 export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
   const history = useNavigate();
+  const { addToCart } = useCart()
 
   const handleProductClick = (productId: number) => {
     history(`/product/${productId}`);
+  };
+  
+  const handleAddToCart = (product: Product) => {
+    addToCart(product);
   };
 
   return (
@@ -71,6 +78,14 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
                   <span className="font-bold">{product.price}</span>
                 )}
               </div>
+              <Button 
+                size="sm" 
+                color="primary"
+                variant="flat"
+                endContent={<Icon icon="lucide:shopping-cart" />}
+                onPress={() => handleAddToCart(product)} >
+                Add
+              </Button>
             </div>
           </CardFooter>
         </Card>

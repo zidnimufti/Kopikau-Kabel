@@ -10,6 +10,7 @@ import {
 } from "@heroui/navbar";
 import { link as linkStyles } from "@heroui/theme";
 import clsx from "clsx";
+import { CartDropdown } from "./CartDropdown";
 
 import { siteConfig } from "@/config/site";
 import { ThemeSwitch } from "@/components/theme-switch";
@@ -20,7 +21,7 @@ export const Navbar = () => {
   
 
   return (
-    <HeroUINavbar maxWidth="xl" position="sticky">
+    <HeroUINavbar maxWidth="xl" position="sticky" >
       <NavbarContent className="basis-1/5 sm:basis-full" justify="start">
         <NavbarBrand className="gap-3 max-w-fit">
           <Link
@@ -56,6 +57,7 @@ export const Navbar = () => {
       >
         <NavbarItem className="hidden sm:flex gap-2">
           <ThemeSwitch />
+          <CartDropdown />
         </NavbarItem>
         <NavbarItem className="hidden md:flex">
         </NavbarItem>
@@ -63,6 +65,7 @@ export const Navbar = () => {
 
       <NavbarContent className="sm:hidden basis-1 pl-4" justify="end">
         <ThemeSwitch />
+        <CartDropdown />
         <NavbarMenuToggle />
       </NavbarContent>
 

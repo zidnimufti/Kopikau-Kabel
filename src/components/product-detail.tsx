@@ -4,6 +4,8 @@ import { Button, Card, CardBody, Chip, Divider } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { Product } from "../types/product";
 import DefaultLayout from "@/layouts/default";
+import { useCart } from "../components/CartContext";
+
 
 interface ProductDetailProps {
   products: Product[];
@@ -13,6 +15,8 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ products }) => {
   const { id } = useParams() as { id: string };
   const history = useNavigate();
   const productId = parseInt(id);
+  const { addToCart } = useCart();
+
   
   const product = products.find(p => p.id === productId);
   
@@ -37,6 +41,12 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ products }) => {
       </div>
     );
   }
+
+  const handleAddToCart = () => {
+    if (product) {
+      addToCart(product);
+    }
+  };
 
   return (
     <DefaultLayout>
@@ -117,6 +127,15 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ products }) => {
                   color="primary" 
                   size="lg"
                   startContent={<Icon icon="lucide:shopping-cart" />}
+                  className="flex-1"
+                  onPress={handleAddToCart}
+                >
+                  Add to Cart
+                </Button>
+                <Button 
+                  variant="flat" 
+                  size="lg"
+                  startContent={<Icon icon="lucide:credit-card" />}
                   className="flex-1"
                   onPress={() => { 
                     const text = product.text;

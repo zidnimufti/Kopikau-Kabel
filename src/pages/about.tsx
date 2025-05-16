@@ -22,7 +22,7 @@ export default function AboutHal() {
     <Card className="w-full md:w-1/2">
       <CardBody>
         <p className="text-justify">Kopi Kau adalah sebuah merek minuman kopi yang menawarkan berbagai variasi kopi dan minuman lainnya. Kopi Kau adalah salah satu brand dari PT. Karya Improvisasi Milenial, sebuah perusahaan yang bergerak di bidang Integrated F&B Franchise and Management. 
-Lebih detailnya, Kopi Kau menawarkan berbagai jenis kopi seperti es kopi susu, es kopi aren, es kopi susu aren, es kopi taro, dan banyak lagi. Mereka juga memiliki menu minuman lainnya seperti es kopi Miss You, es kopi vanilla, dan es kopi matcha. Selain itu, Kopi Kau juga menawarkan paket kemitraan bagi yang ingin membuka usaha minuman kopi, dengan berbagai pilihan paket yang bisa disesuaikan dengan kebutuhan.</p>
+Lebih detailnya, Kopi Kau menawarkan berbagai jenis kopi seperti es kopi susu, es kopi aren, es kopi susu aren, es kopi taro, dan banyak lagi. Mereka juga memiliki menu minuman lainnya seperti es kopi Miss You, es kopi vanilla, dan es kopi matcha. </p>
       </CardBody>
     </Card>
   </div>
