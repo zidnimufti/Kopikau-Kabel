@@ -162,7 +162,7 @@ export const products: Product[] = [
     id: 13,
     name: "Lychee Latte",
     description: "lychee latte adalah minuman yang terbuat dari campuran susu, bubuk lychee (atau ekstrak lychee), dan bahan lainnya seperti gula atau krimer.",
-    price: formatRupiah(8000),
+    price: formatRupiah(10000),
     discountedPrice: 99.99,
     discount: 0,
     image: "/img/lecilatte.png",
