@@ -139,7 +139,7 @@ export const products: Product[] = [
     price: formatRupiah(8000),
     discountedPrice: 129.99,
     discount: 0,
-    image: "/img/kosong.png",
+    image: "/img/arenmilkmagic.png",
     category: "Non Coffee",
     isNew: false,
     inStock: true,
@@ -157,32 +157,34 @@ export const products: Product[] = [
     isNew: false,
     inStock: true,
     text: "Saya ingin membeli Vanilla Milk"
-  }
-  /*
+  },
   {
     id: 13,
-    name: "Kopi Dalgona",
-    description: "Kopi Dalgona adalah minuman segar yang terbuat dari kopi yang disajikan dengan es. Cocok untuk penggemar minuman segar. Nikmati cita rasa segar yang menggugah selera.",
-    price: formatRupiah(15000),
+    name: "Lychee Latte",
+    description: "lychee latte adalah minuman yang terbuat dari campuran susu, bubuk lychee (atau ekstrak lychee), dan bahan lainnya seperti gula atau krimer.",
+    price: formatRupiah(8000),
     discountedPrice: 99.99,
     discount: 0,
-    image: "/img/dalgona.jpg",
+    image: "/img/lecilatte.png",
     category: "Minuman",
-    isNew: false,
-    inStock: true
+    isNew: true,
+    inStock: true,
+    text: "Saya ingin membeli Lychee Latte"
   },
   {
     id: 14,
-    name: "Es Campur",
-    description: "Es Campur adalah minuman segar yang terbuat dari berbagai jenis buah-buahan dan es. Cocok untuk penggemar minuman segar. Nikmati cita rasa segar yang menggugah selera.",
-    price: formatRupiah(10000),
+    name: "Lychee Tea",
+    description: "Lychee tea adalah minuman yang terbuat dari campuran teh, bubuk lychee (atau ekstrak lychee), dan bahan lainnya seperti gula atau krimer.",
+    price: formatRupiah(8000),
     discountedPrice: 89.99,
     discount: 0,
-    image: "/img/campur.jpeg",
+    image: "/img/lecitea.png",
     category: "Minuman",
     isNew: true,
-    inStock: true
-  },
+    inStock: true,
+    text: "Saya ingin membeli Lychee Tea"
+  }
+  /*
   {
     id: 15,
     name: "Es Jeruk",
