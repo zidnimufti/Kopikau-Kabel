@@ -27,17 +27,14 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
         <Card 
           key={product.id} 
           className="border border-default-200"
-          isHoverable
-          isPressable
           onPress={() => handleProductClick(product.id)}
         >
           <CardBody className="p-0 overflow-hidden">
             <div className="relative">
               <img
-                width={300}
                 src={product.image}
                 alt={product.name}
-                className="w-full h-64 object-cover"
+                className="w-full h-full"
               />
               {product.isNew && (
                 <Chip 

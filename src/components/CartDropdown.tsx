@@ -392,8 +392,11 @@ export const CartDropdown: React.FC = () => {
 
                       let uangLine = "";
                       if (selectedCashOption === "input_amount") {
-                        // Jika user memilih “Input jumlah”, gunakan nilai dari inputAmount
-                        uangLine = `Uang: Rp.${inputAmount}`;
+                        uangLine = `Jumlah Uang yang akan dibayarkan: Rp.${inputAmount}`;
+                      } else if (selectedCashOption === "100") {
+                        uangLine = `Jumlah Uang yang akan dibayarkan: Rp.100000`;
+                      } else if (selectedCashOption === "50") {
+                        uangLine = `Jumlah Uang yang akan dibayarkan: Rp.50000`;
                       }
 
                       // Gabungkan semua baris menjadi satu string dengan \n

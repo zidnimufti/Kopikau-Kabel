@@ -7,7 +7,7 @@ import DefaultLayout from "@/layouts/default";
 
 export default function ProductPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
-  const itemsPerPage = 8;
+  const itemsPerPage = 100;
   
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;

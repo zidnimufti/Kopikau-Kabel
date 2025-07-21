@@ -183,6 +183,32 @@ export const products: Product[] = [
     isNew: true,
     inStock: true,
     text: "Saya ingin membeli Lychee Tea"
+  },
+  {
+    id: 15,
+    name: "Es Kopi Thailand",
+    description: "Es Kopi Thailand adalah minuman kopi yang terbuat dari campuran kopi, susu kental manis, dan es. Cocok untuk penggemar kopi. Nikmati cita rasa kopi yang kaya dan manis.",
+    price: formatRupiah(15000),
+    discountedPrice: 89.99,
+    discount: 0,
+    image: "/img/EsKopiThailand.png",
+    category: "Minuman",
+    isNew: true,
+    inStock: true,
+    text: "Saya ingin membeli Es Kopi Thailand"
+  },
+  {
+    id: 16,
+    name: "Es Kopi Vietnam",
+    description: "Es Kopi Vietnam adalah minuman kopi yang terbuat dari campuran kopi, susu kental manis, dan es. Cocok untuk penggemar kopi. Nikmati cita rasa kopi yang kaya dan manis.",
+    price: formatRupiah(15000),
+    discountedPrice: 89.99,
+    discount: 0,
+    image: "/img/EsKopiVietnam.png",
+    category: "Minuman",
+    isNew: true,
+    inStock: true,
+    text: "Saya ingin membeli Es Kopi Vietnam"
   }
   /*
   {
