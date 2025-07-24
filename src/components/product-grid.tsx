@@ -27,8 +27,6 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
         <Card 
           key={product.id} 
           className="border border-default-200"
-          isHoverable
-          isPressable
           onPress={() => handleProductClick(product.id)}
         >
           <CardBody className="p-0 overflow-hidden">

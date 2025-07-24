@@ -139,8 +139,11 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ products }) => {
                   className="flex-1"
                   onPress={() => { 
                     const text = product.text;
-                    const url = `https://api.whatsapp.com/send/?phone=%2B6285955005269&text=${encodeURIComponent(text)}`;
-                    window.open(url, "_blank");}}
+                    // FIX: Baca nomor WhatsApp dari environment variable
+                    const phoneNumber = import.meta.env.VITE_WHATSAPP_NUMBER;
+                    const url = `https://api.whatsapp.com/send/?phone=${phoneNumber}&text=${encodeURIComponent(text)}`;
+                    window.open(url, "_blank");
+                  }}
                 >
                   Beli Sekarang
                 </Button>
