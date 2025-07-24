@@ -1,5 +1,5 @@
 import { Container } from "../components/Container";
-import {Image} from "@heroui/image";
+import {Image} from "@heroui/react";
 import DefaultLayout from "@/layouts/default";
 import heroImg from "../img/logo.jpg"
 
