@@ -254,12 +254,10 @@ const OrderHistoryPage = () => {
 
         {/* Ringkasan */}
         <div className="mt-3 text-sm text-gray-700">
-          Completed dalam rentang: <span className="font-semibold">{completedInRange.length}</span>{' '}
-          order • Total Omset:{' '}
-          <span className="font-semibold">
-            {fmtIDR(completedInRange.reduce((s, o) => s + (o.total_amount || 0), 0))}
-          </span>
-        </div>
+  Completed dalam rentang: <span className="font-semibold">{completedInRange.length}</span>{' '}
+  order • Total Omset:{' '}
+  <span className="font-semibold">{fmtIDR(totalOmset)}</span>
+</div>
       </div>
 
       {/* MOBILE: Card list */}
