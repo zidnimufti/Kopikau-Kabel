@@ -1,3 +1,6 @@
+// --- FILE: src/components/CartDropdown.tsx (UPDATED) ---
+// Deskripsi: Menambahkan prop 'textValue' untuk mengatasi peringatan aksesibilitas.
+
 import React, { useState, useEffect } from "react";
 import { 
   Dropdown, 
@@ -32,21 +35,16 @@ export const CartDropdown: React.FC = () => {
     clearCart
   } = useCart();
 
-  // Modal pertama (instruksi bayar)
+  // ... (semua state dan logika hooks lainnya tetap sama) ...
   const {
     isOpen: isOpenFirstModal,
     onOpen: onOpenFirstModal,
     onOpenChange: onOpenChangeFirstModal
   } = useDisclosure();
-
-  // State untuk menyimpan data URI QRIS
   const [qrisDataUri, setQrisDataUri] = useState<string>("");
   const [loadingQris, setLoadingQris] = useState(false);
-
-  // Payment yang dipilih user (sementara, sebelum set benar-benar ke context)
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>(paymentMethod);
-
-  // Generate QRIS setiap modal pertama dibuka dan metode === "qris"
+  const phoneNumber = import.meta.env.VITE_WHATSAPP_NUMBER;
   useEffect(() => {
     if (isOpenFirstModal && selectedPayment === "qris" && totalPrice > 0) {
       setLoadingQris(true);
@@ -59,48 +57,36 @@ export const CartDropdown: React.FC = () => {
         })
         .finally(() => setLoadingQris(false));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpenFirstModal, selectedPayment, totalPrice]);
-
   const handleQuantityChange = (productId: number, change: number) => {
     const item = cartItems.find(item => item.product.id === productId);
     if (item) {
       updateQuantity(productId, item.quantity + change);
     }
   };
-
   const handlePaymentChange = (value: string) => {
     setSelectedPayment(value as PaymentMethod);
   };
-
   const handleCheckout = () => {
     if (selectedPayment) {
       setPaymentMethod(selectedPayment);
-      onOpenFirstModal(); // buka modal pertama
+      onOpenFirstModal();
     }
   };
-
-  // ======= Modal Kedua (Prompt Konfirmasi) =======
   const {
     isOpen: isOpenSecondModal,
     onOpen: onOpenSecondModal,
     onOpenChange: onOpenChangeSecondModal
   } = useDisclosure();
-
-  // State untuk menyimpan pilihan di modal kedua (hanya untuk cash)
   const [selectedCashOption, setSelectedCashOption] = useState<string>("");
-  // State tambahan agar user bisa input angka jika memilih opsi "input_amount"
   const [inputAmount, setInputAmount] = useState<string>("");
-
   const handleConfirmOrder = () => {
-    // Tutup modal pertama
     onOpenChangeFirstModal(); 
-    // Buka modal kedua
     onOpenSecondModal();
-    // Reset pilihan & input form
     setSelectedCashOption("");
     setInputAmount("");
   };
+
 
   return (
     <>
@@ -133,16 +119,16 @@ export const CartDropdown: React.FC = () => {
           disallowEmptySelection
         >
           {/* Judul */}
-          <DropdownItem key="cart-title" isReadOnly className="py-2">
+          <DropdownItem key="cart-title" isReadOnly className="py-2" textValue="Shopping Cart">
             <p className="text-lg font-semibold">Shopping Cart</p>
           </DropdownItem>
-          <DropdownItem key="divider-1" isReadOnly>
+          <DropdownItem key="divider-1" isReadOnly textValue="Divider">
             <Divider />
           </DropdownItem>
           
           {/* Jika keranjang kosong */}
           {cartItems.length === 0 ? (
-            <DropdownItem key="empty-cart" isReadOnly className="py-4">
+            <DropdownItem key="empty-cart" isReadOnly className="py-4" textValue="Your cart is empty">
               <div className="flex flex-col items-center justify-center">
                 <Icon icon="lucide:shopping-cart" className="text-3xl text-default-400 mb-2" />
                 <p className="text-default-500">Your cart is empty</p>
@@ -152,17 +138,23 @@ export const CartDropdown: React.FC = () => {
             <>
               {/* Daftar item */}
               {cartItems.map((item) => (
-                <DropdownItem key={item.product.id} isReadOnly className="py-2">
+                <DropdownItem 
+                  key={item.product.id} 
+                  isReadOnly 
+                  className="py-2"
+                  // FIX: Menambahkan prop 'textValue' untuk aksesibilitas
+                  textValue={`${item.product.name} x ${item.quantity}`}
+                >
                   <div className="flex items-center gap-3">
                     <img 
-                      src={item.product.image} 
+                      src={item.product.image_url || 'https://placehold.co/48x48/e2e8f0/e2e8f0?text=No-Image'} 
                       alt={item.product.name} 
                       className="w-12 h-12 object-cover rounded-md"
                     />
                     <div className="flex-1">
                       <p className="text-sm font-medium line-clamp-1">{item.product.name}</p>
                       <p className="text-xs text-default-500">
-                        {item.product.price} x {item.quantity}
+                        Rp {item.product.price.toLocaleString('id-ID')} x {item.quantity}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
@@ -197,20 +189,20 @@ export const CartDropdown: React.FC = () => {
                 </DropdownItem>
               ))}
 
-              <DropdownItem key="divider-2" isReadOnly>
+              <DropdownItem key="divider-2" isReadOnly textValue="Divider">
                 <Divider />
               </DropdownItem>
 
               {/* Total Harga */}
-              <DropdownItem key="total" isReadOnly className="py-2">
+              <DropdownItem key="total" isReadOnly className="py-2" textValue={`Total: Rp ${totalPrice.toLocaleString('id-ID')}`}>
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Total:</span>
-                  <span className="font-bold">Rp. {totalPrice.toFixed(0)}</span>
+                  <span className="font-bold">Rp {totalPrice.toLocaleString('id-ID')}</span>
                 </div>
               </DropdownItem>
 
               {/* Pilih Metode Pembayaran */}
-              <DropdownItem key="payment-method" isReadOnly className="py-2">
+              <DropdownItem key="payment-method" isReadOnly className="py-2" textValue="Payment Method">
                 <div className="flex flex-col gap-2">
                   <p className="text-sm font-medium">Payment Method:</p>
                   <RadioGroup 
@@ -225,7 +217,7 @@ export const CartDropdown: React.FC = () => {
               </DropdownItem>
 
               {/* Tombol Checkout */}
-              <DropdownItem key="checkout" isReadOnly className="py-2">
+              <DropdownItem key="checkout" isReadOnly className="py-2" textValue="Checkout">
                 <Button 
                   color="primary" 
                   className="w-full" 
@@ -240,7 +232,7 @@ export const CartDropdown: React.FC = () => {
         </DropdownMenu>
       </Dropdown>
 
-      {/* ========== Modal Pertama (Instruksi Bayar) ========== */}
+      {/* ... (semua kode untuk Modal tetap sama) ... */}
       <Modal isOpen={isOpenFirstModal} onOpenChange={onOpenChangeFirstModal}>
         <ModalContent>
           {(onClose) => (
@@ -291,7 +283,6 @@ export const CartDropdown: React.FC = () => {
         </ModalContent>
       </Modal>
 
-      {/* ========== Modal Kedua (Prompt Konfirmasi) ========== */}
       <Modal isOpen={isOpenSecondModal} onOpenChange={onOpenChangeSecondModal}>
         <ModalContent>
           {(onClosePrompt) => (
@@ -299,13 +290,11 @@ export const CartDropdown: React.FC = () => {
               <ModalHeader>Konfirmasi Order</ModalHeader>
               <ModalBody>
                 {paymentMethod === "qris" ? (
-                  // Jika QRIS, tampilkan instruksi lama
                   <p>
                     Silahkan konfirmasi orderan Anda. Jika Anda menggunakan QRIS maka lampirkan bukti pembayarannya. 
                     Jika ada pesan yang lainnya, tolong tambahkan setelah mengirim pesan ini.
                   </p>
                 ) : (
-                  // Jika CASH, tampilkan beberapa pilihan, termasuk form angka jika dipilih “Input Jumlah”
                   <div className="flex flex-col gap-4">
                     <p>Pilih Pecahan Uang yang akan dibayarkan:</p>
                     <RadioGroup
@@ -313,7 +302,6 @@ export const CartDropdown: React.FC = () => {
                       value={selectedCashOption}
                       onValueChange={(val) => {
                         setSelectedCashOption(val);
-                        // Jika pilihan berubah bukan "input_amount", reset inputAmount
                         if (val !== "input_amount") {
                           setInputAmount("");
                         }
@@ -330,7 +318,6 @@ export const CartDropdown: React.FC = () => {
                       </Radio>
                     </RadioGroup>
 
-                    {/* Tampilkan form input angka jika opsi "input_amount" dipilih */}
                     {selectedCashOption === "input_amount" && (
                       <div className="flex flex-col gap-2">
                         <label htmlFor="inputAmount" className="text-sm font-medium">
@@ -356,7 +343,6 @@ export const CartDropdown: React.FC = () => {
                   color="danger"
                   variant="light"
                   onPress={() => {
-                    // Tutup modal kedua tanpa melakukan apa-apa
                     onClosePrompt();
                   }}
                 >
@@ -366,8 +352,6 @@ export const CartDropdown: React.FC = () => {
                 <Button
                   color="primary"
                   isDisabled={
-                    // Jika metode CASH ➞ disable saat belum memilih opsi
-                    // Jika opsi "input_amount" ➞ juga disable jika angka belum diisi
                     paymentMethod === "cash" && (
                       !selectedCashOption ||
                       (selectedCashOption === "input_amount" && !inputAmount)
@@ -375,18 +359,16 @@ export const CartDropdown: React.FC = () => {
                   }
                   onPress={() => {
                     if (paymentMethod === "qris") {
-                      // Logika untuk QRIS (sama seperti sebelumnya)
                       const textLines = [
                         ...cartItems.map(item => `${item.product.name} x${item.quantity}`),
                         `Total: Rp.${totalPrice.toFixed(0)}`
                       ];
                       const text = textLines.join("\n");
-                      const url = `https://api.whatsapp.com/send/?phone=%2B6285955005269&text=${encodeURIComponent(text)}`;
+                      const url = `https://api.whatsapp.com/send/?phone=${phoneNumber}&text=${encodeURIComponent(text)}`;
                       window.open(url, "_blank");
                       clearCart();
                       onClosePrompt();
                     } else {
-                      // Logika untuk CASH: susun pesan sesuai format yang diminta
                       const itemLines = cartItems.map(item => `${item.product.name} x${item.quantity}`);
                       const totalLine = `Total: Rp.${totalPrice.toFixed(0)}`;
 
@@ -399,15 +381,13 @@ export const CartDropdown: React.FC = () => {
                         uangLine = `Jumlah Uang yang akan dibayarkan: Rp.50000`;
                       }
 
-                      // Gabungkan semua baris menjadi satu string dengan \n
                       const textLines = [
                         ...itemLines,
                         totalLine,
                         uangLine
                       ];
                       const text = textLines.join("\n");
-
-                      const url = `https://api.whatsapp.com/send/?phone=%2B6285955005269&text=${encodeURIComponent(text)}`;
+                      const url = `https://api.whatsapp.com/send/?phone=${phoneNumber}&text=${encodeURIComponent(text)}`;
                       window.open(url, "_blank");
                       clearCart();
                       onClosePrompt();

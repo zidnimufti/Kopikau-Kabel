@@ -1,6 +1,10 @@
+// --- FILE: src/components/CartContext.tsx (UPDATED) ---
+// Deskripsi: Memperbaiki bug dengan menghapus panggilan parseRupiah yang tidak perlu.
+
 import React, { createContext, useContext, useState } from "react";
-import { Product } from "../types/product";
-import { parseRupiah } from "@/components/rupiah";
+import { Product } from "../types/";
+// Kita tidak lagi memerlukan parseRupiah di sini
+// import { parseRupiah } from "@/components/rupiah";
 
 
 // Define cart item type (product + quantity)
@@ -98,8 +102,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const totalItems = cartItems.reduce((total, item) => total + item.quantity, 0);
 
   // Calculate total price
+  // FIX: Hapus panggilan ke parseRupiah. Gunakan item.product.price secara langsung.
   const totalPrice = cartItems.reduce(
-    (total, item) => total + (parseRupiah(item.product.price) * item.quantity), 
+    (total, item) => total + (item.product.price * item.quantity), 
     0
   );
 

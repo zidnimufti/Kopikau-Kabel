@@ -17,7 +17,7 @@ export default function DefaultLayout({
         <Link
           isExternal
           className="flex items-center gap-1 text-current"
-          href="https://www.facebook.com/widla.zidni"
+          href="https://www.instagram.com/zidni_mufti/"
         >
           <span className="text-default-600">Powered by</span>
           <p className="text-primary">Orang Ganteng</p>

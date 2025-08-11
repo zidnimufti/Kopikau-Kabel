@@ -1,43 +1,40 @@
-import React from "react";
-import {  Pagination } from "@heroui/react";
-import { ProductGrid } from "../components/product-grid";
-import { products } from "../data/product";
-import { Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
 import DefaultLayout from "@/layouts/default";
+import { ProductGrid } from "@/components/product-grid"; // Sesuaikan path
+import { getPublicProducts } from "@/api/publicApi"; // Sesuaikan path
+import { Product } from "@/types"; // Sesuaikan path
 
-export default function ProductPage() {
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const itemsPerPage = 100;
-  
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentProducts = products.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(products.length / itemsPerPage);
-  
-  return (
-    <DefaultLayout>
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <Routes>
-        <Route 
-        path=""
-        element={
-          <>
-          <ProductGrid products={currentProducts} />
-          
-          <div className="flex justify-center mt-8">
-            <Pagination
-              total={totalPages}
-              initialPage={1}
-              page={currentPage}
-              onChange={setCurrentPage}
-              showControls
-            />
-          </div>
-          </>
-        }
-        />
-      </Routes>
-    </div>
-    </DefaultLayout>
-  );
-}
+const ProductPage = () => {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        getPublicProducts()
+            .then(data => {
+                setProducts(data || []);
+            })
+            .catch(err => {
+                setError(err.message);
+            })
+            .finally(() => {
+                setLoading(false);
+            });
+    }, []);
+
+    if (loading) {
+        return <DefaultLayout><div>Loading products...</div></DefaultLayout>;
+    }
+
+    if (error) {
+        return <DefaultLayout><div>Error: {error}</div></DefaultLayout>;
+    }
+
+    return (
+        <DefaultLayout>
+            <ProductGrid products={products} />
+        </DefaultLayout>
+    );
+};
+
+export default ProductPage;

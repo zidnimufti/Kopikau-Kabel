@@ -24,7 +24,7 @@ export const siteConfig = {
     },
     {
       label: "Produk",
-      href: "/docs",
+      href: "/produk",
     },
     {
       label: "Tentang",
