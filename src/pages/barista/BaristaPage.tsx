@@ -1,6 +1,7 @@
 // --- FILE: src/pages/barista/BaristaPage.tsx ---
 // QUEUE TANPA ORDER ID, TANPA HAPUS + METODE PEMBAYARAN
 // + Sidebar ringkasan penjualan barista HARI INI (completed only) + realtime refresh
+// + FIX mobile sheet: h-[85dvh] + list scrollable
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -132,7 +133,11 @@ const OrderCart = ({
         <p className="mt-1 text-xs text-gray-500">Wajib pilih salah satu.</p>
       </div>
 
-      <div className="flex-grow overflow-y-auto mt-4">
+      {/* AREA LIST YANG SCROLLABLE */}
+      <div
+        className="flex-grow overflow-y-auto mt-4 touch-pan-y"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         {cart.length === 0 ? (
           <p className="text-gray-500">Cart is empty.</p>
         ) : (
@@ -609,11 +614,11 @@ const BaristaPage = () => {
         </Link>
       </footer>
 
-      {/* MOBILE: Bottom Sheet Cart */}
+      {/* MOBILE: Bottom Sheet Cart (FIX: tinggi pasti + flex kolom) */}
       {isCartOpen && (
         <div className="md:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsCartOpen(false)} />
-          <div className="absolute left-0 right-0 bottom-0 max-h-[85%] bg-white rounded-t-2xl shadow-lg overflow-hidden">
+          <div className="absolute left-0 right-0 bottom-0 h-[85dvh] bg-white rounded-t-2xl shadow-lg overflow-hidden flex flex-col">
             <OrderCart
               cart={cart}
               customerName={customerName}
