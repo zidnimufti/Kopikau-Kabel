@@ -43,5 +43,9 @@ export interface Order {
   customer_name: string;
   total_amount: number;
   status: string;
-  created_by: string | null;
+  created_by?: string | null;
+  payment_method?: 'cash' | 'qris'; // NEW
+
 }
+
+
