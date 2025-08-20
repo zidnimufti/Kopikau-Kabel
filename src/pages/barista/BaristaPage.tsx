@@ -779,14 +779,7 @@ export default function BaristaPage() {
                 onCustomerNameChange={setCustomerName}
                 onPaymentMethodChange={setPaymentMethod}
                 onSubmit={handleSubmitOrder}
-                onUpdateQuantity={(id, q) => {
-                  if (q <= 0)
-                    setCart((c) => c.filter((i) => i.id !== id));
-                  else
-                    setCart((c) =>
-                      c.map((i) => (i.id === id ? { ...i, quantity: q } : i))
-                    );
-                }}
+                onUpdateQuantity={handleUpdateQuantity}
                 onRemoveItem={(id) =>
                   setCart((c) => c.filter((i) => i.id !== id))
                 }
