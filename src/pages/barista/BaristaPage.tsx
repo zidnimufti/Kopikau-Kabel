@@ -526,15 +526,14 @@ export default function BaristaPage() {
   };
 
   const handleAddToCart = (product: Product) => {
-    setCart((currentCart) => {
-      const existing = currentCart.find((i) => i.id === product.id);
-      if (existing) {
-        return currentCart.map((i) =>
-          i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...currentCart, { ...product, quantity: 1 }];
-    });
+    <Button
+  className="mt-auto"
+  color="primary"
+  onPress={() => handleAddToCart(product)}  // ← pakai fungsi
+>
+  Tambah
+</Button>
+
   };
 
   const handleUpdateQuantity = (productId: number, newQuantity: number) => {
@@ -721,14 +720,7 @@ export default function BaristaPage() {
               onCustomerNameChange={setCustomerName}
               onPaymentMethodChange={setPaymentMethod}
               onSubmit={handleSubmitOrder}
-              onUpdateQuantity={(id, q) => {
-                if (q <= 0)
-                  setCart((c) => c.filter((i) => i.id !== id));
-                else
-                  setCart((c) =>
-                    c.map((i) => (i.id === id ? { ...i, quantity: q } : i))
-                  );
-              }}
+              onUpdateQuantity={handleUpdateQuantity}
               onRemoveItem={(id) =>
                 setCart((c) => c.filter((i) => i.id !== id))
               }
