@@ -1,12 +1,8 @@
-// --- FILE: src/pages/barista/BaristaPage.tsx ---
-// QUEUE TANPA ORDER ID, TANPA HAPUS + METODE PEMBAYARAN
-// + Sidebar ringkasan penjualan barista HARI INI (completed only) + realtime refresh
-// + FIX mobile sheet: h-[85dvh] + list scrollable
-
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import { Category, Product, CartItem, Order } from '../../types';
+// --- FILE: src/pages/barista/BaristaPage.tsx (HeroUI + Auth Guard) ---
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { Category, Product, CartItem, Order } from "../../types";
 import {
   getActiveMenu,
   createOrder,
@@ -14,19 +10,34 @@ import {
   updateOrderStatus,
   getOrderWithItems,
   updateOrderAndItems,
-} from '../../api/orderApi';
-import { useAuth } from '../../auth/hooks/useAuth';
-import { useProfile } from '../../auth/hooks/useProfile';
-import { supabase } from '../../api/supabaseClient';
-import { Link } from '@heroui/link';
+} from "../../api/orderApi";
+import { useAuth } from "../../auth/hooks/useAuth";
+import { useProfile } from "../../auth/hooks/useProfile";
+import { supabase } from "../../api/supabaseClient";
 
-type PaymentMethod = 'cash' | 'qris';
+import {
+  Button,
+  Card,
+  CardBody,
+  Chip,
+  Divider,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalHeader,
+  Spinner,
+} from "@heroui/react";
+import { Link as HeroLink } from "@heroui/link";
 
-// Helper format rupiah
+type PaymentMethod = "cash" | "qris";
+
 const fmtIDR = (n: number) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(n);
+  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(
+    n
+  );
 
-// ===== Ikon kecil
+// Small icon
 const TrashIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -44,11 +55,11 @@ const TrashIcon = () => (
   </svg>
 );
 
-// ===== Cart (dipakai desktop & mobile sheet)
+/* ============================= Cart component ============================= */
 interface OrderCartProps {
   cart: CartItem[];
   customerName: string;
-  paymentMethod: '' | PaymentMethod;
+  paymentMethod: "" | PaymentMethod;
   isSubmitting: boolean;
   onCustomerNameChange: (name: string) => void;
   onPaymentMethodChange: (pm: PaymentMethod) => void;
@@ -60,6 +71,7 @@ interface OrderCartProps {
   isEditing?: boolean;
   onCancelEdit?: () => void;
 }
+
 const OrderCart = ({
   cart,
   customerName,
@@ -76,127 +88,149 @@ const OrderCart = ({
   onCancelEdit,
 }: OrderCartProps) => {
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const placeDisabled = cart.length === 0 || !customerName || !paymentMethod || isSubmitting;
+  const placeDisabled =
+    cart.length === 0 || !customerName || !paymentMethod || isSubmitting;
 
   return (
-    <div className="bg-white h-full flex flex-col p-4 shadow-lg">
+    <div className="h-full flex flex-col">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">{isEditing ? 'Edit Order' : 'Current Order'}</h2>
+        <h2 className="text-xl font-bold">
+          {isEditing ? "Edit Order" : "Current Order"}
+        </h2>
         <div className="flex items-center gap-2">
           {isEditing && onCancelEdit ? (
-            <button onClick={onCancelEdit} className="text-sm px-3 py-1 rounded bg-gray-100">
+            <Button size="sm" variant="flat" onPress={onCancelEdit}>
               Batalkan Edit
-            </button>
+            </Button>
           ) : null}
           {showClose ? (
-            <button onClick={onClose} className="md:hidden text-sm px-3 py-1 rounded bg-gray-100">
+            <Button size="sm" variant="flat" className="md:hidden" onPress={onClose}>
               Tutup
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
 
+      {/* Customer */}
       <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700">Customer Name</label>
-        <input
-          type="text"
+        <Input
+          label="Customer Name"
+          placeholder="John Doe"
           value={customerName}
           onChange={(e) => onCustomerNameChange(e.target.value)}
-          placeholder="e.g., John Doe"
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500"
         />
       </div>
 
-      {/* Metode Pembayaran */}
+      {/* Payment */}
       <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700">Metode Pembayaran</label>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => onPaymentMethodChange('cash')}
-            className={`px-3 py-2 rounded-md border ${
-              paymentMethod === 'cash' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'
-            }`}
+        <div className="text-sm font-medium text-default-700 mb-2">
+          Metode Pembayaran
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            onPress={() => onPaymentMethodChange("cash")}
+            color={paymentMethod === "cash" ? "primary" : "default"}
+            variant={paymentMethod === "cash" ? "solid" : "flat"}
           >
             Cash
-          </button>
-          <button
-            type="button"
-            onClick={() => onPaymentMethodChange('qris')}
-            className={`px-3 py-2 rounded-md border ${
-              paymentMethod === 'qris' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white'
-            }`}
+          </Button>
+          <Button
+            onPress={() => onPaymentMethodChange("qris")}
+            color={paymentMethod === "qris" ? "primary" : "default"}
+            variant={paymentMethod === "qris" ? "solid" : "flat"}
           >
             QRIS
-          </button>
+          </Button>
         </div>
-        <p className="mt-1 text-xs text-gray-500">Wajib pilih salah satu.</p>
+        <div className="mt-1 text-xs text-default-500">
+          Wajib pilih salah satu.
+        </div>
       </div>
 
-      {/* AREA LIST YANG SCROLLABLE */}
-      <div
-        className="flex-grow overflow-y-auto mt-4 touch-pan-y"
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
-        {cart.length === 0 ? (
-          <p className="text-gray-500">Cart is empty.</p>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {cart.map((item) => (
-              <li key={item.id} className="py-3 flex flex-col">
-                <div className="flex justify-between items-center gap-3">
-                  <p className="font-medium break-words">{item.name}</p>
-                  <p className="font-semibold">
-                    {new Intl.NumberFormat('id-ID').format(item.price * item.quantity)}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-sm text-gray-500">
-                    {new Intl.NumberFormat('id-ID').format(item.price)} x {item.quantity}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                      className="bg-gray-200 rounded-full w-6 h-6 flex items-center justify-center font-bold"
-                    >
-                      -
-                    </button>
-                    <span>{item.quantity}</span>
-                    <button
-                      onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                      className="bg-gray-200 rounded-full w-6 h-6 flex items-center justify-center font-bold"
-                    >
-                      +
-                    </button>
-                    <button onClick={() => onRemoveItem(item.id)} className="text-red-500 hover:text-red-700 ml-2">
-                      <TrashIcon />
-                    </button>
+      {/* Items */}
+      <Card className="mt-4 flex-1 min-h-0">
+        <CardBody className="flex-1 min-h-0 overflow-y-auto">
+          {cart.length === 0 ? (
+            <div className="text-default-500">Cart is empty.</div>
+          ) : (
+            <ul className="divide-y divide-default-200">
+              {cart.map((item) => (
+                <li key={item.id} className="py-3">
+                  <div className="flex justify-between items-center gap-3">
+                    <p className="font-medium break-words">{item.name}</p>
+                    <p className="font-semibold">
+                      {new Intl.NumberFormat("id-ID").format(
+                        item.price * item.quantity
+                      )}
+                    </p>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-sm text-default-500">
+                      {new Intl.NumberFormat("id-ID").format(item.price)} ×{" "}
+                      {item.quantity}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="flat"
+                        onPress={() =>
+                          onUpdateQuantity(item.id, item.quantity - 1)
+                        }
+                      >
+                        –
+                      </Button>
+                      <span>{item.quantity}</span>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="flat"
+                        onPress={() =>
+                          onUpdateQuantity(item.id, item.quantity + 1)
+                        }
+                      >
+                        +
+                      </Button>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        color="danger"
+                        variant="light"
+                        onPress={() => onRemoveItem(item.id)}
+                      >
+                        <TrashIcon />
+                      </Button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
 
-      <div className="border-t pt-4">
-        <div className="flex justify-between items-center font-bold text-lg mb-4">
+      {/* Footer */}
+      <div className="mt-4">
+        <div className="flex justify-between items-center font-bold text-lg mb-3">
           <span>Total</span>
           <span>{fmtIDR(total)}</span>
         </div>
-        <button
-          onClick={onSubmit}
-          disabled={placeDisabled}
-          className="w-full bg-green-600 text-white py-3 rounded-md text-lg font-bold hover:bg-green-700 disabled:bg-gray-400"
+        <Button
+          fullWidth
+          color="success"
+          isDisabled={placeDisabled}
+          isLoading={isSubmitting}
+          onPress={onSubmit}
         >
-          {isEditing ? (isSubmitting ? 'Updating...' : 'Update Order') : isSubmitting ? 'Placing Order...' : 'Place Order'}
-        </button>
+          {isEditing ? "Update Order" : "Place Order"}
+        </Button>
       </div>
     </div>
   );
 };
 
-// ===== Pending Orders (tampilkan item; TANPA Order ID & TANPA tombol Hapus)
+/* ========================= Pending orders list ========================= */
 type PendingOrderWithItems = Order & {
   payment_method?: PaymentMethod;
   items?: { product_id: number; quantity: number; product?: Product }[];
@@ -208,54 +242,70 @@ const PendingOrdersList = ({
   onEdit,
 }: {
   orders: PendingOrderWithItems[];
-  onUpdateStatus: (orderId: number, status: 'completed' | 'cancelled') => void;
+  onUpdateStatus: (orderId: number, status: "completed" | "cancelled") => void;
   onEdit: (orderId: number) => void;
 }) => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
     {orders.map((order) => (
-      <div key={order.id} className="bg-yellow-100 p-3 rounded-md shadow flex flex-col">
-        <div>
-          <p className="font-bold text-lg break-words">{order.customer_name}</p>
-          {order.payment_method && (
-            <p className="text-xs text-gray-600 mt-1">Metode: {order.payment_method.toUpperCase()}</p>
-          )}
-        </div>
+      <Card key={order.id} shadow="sm" className="bg-yellow-50">
+        <CardBody className="space-y-2">
+          <div>
+            <p className="font-bold text-lg break-words">{order.customer_name}</p>
+            {order.payment_method && (
+              <Chip size="sm" variant="flat" color="primary" className="mt-1">
+                {order.payment_method.toUpperCase()}
+              </Chip>
+            )}
+          </div>
 
-        <ul className="mt-3 text-sm text-gray-800 space-y-1">
-          {(order.items ?? []).map((it) => (
-            <li key={`${order.id}-${it.product_id}`} className="flex justify-between">
-              <span className="truncate">{it.product?.name ?? 'Item'}</span>
-              <span className="ml-2 font-medium">x{it.quantity}</span>
-            </li>
-          ))}
-          {(!order.items || order.items.length === 0) && <li className="text-gray-500">Belum ada item.</li>}
-        </ul>
+          <Divider />
 
-        <div className="flex gap-2 mt-3">
-          <button onClick={() => onEdit(order.id)} className="flex-1 bg-blue-500 text-white text-xs py-1 rounded hover:bg-blue-600">
-            Edit
-          </button>
-          <button
-            onClick={() => onUpdateStatus(order.id, 'completed')}
-            className="flex-1 bg-green-500 text-white text-xs py-1 rounded hover:bg-green-600"
-          >
-            Selesai
-          </button>
-          <button
-            onClick={() => onUpdateStatus(order.id, 'cancelled')}
-            className="flex-1 bg-red-500 text-white text-xs py-1 rounded hover:bg-red-600"
-          >
-            Batal
-          </button>
-        </div>
-      </div>
+          <div className="text-sm text-default-700 space-y-1">
+            {(order.items ?? []).map((it) => (
+              <div
+                key={`${order.id}-${it.product_id}`}
+                className="flex justify-between"
+              >
+                <span className="truncate">{it.product?.name ?? "Item"}</span>
+                <span className="ml-2 font-medium">×{it.quantity}</span>
+              </div>
+            ))}
+            {(!order.items || order.items.length === 0) && (
+              <div className="text-default-400">Belum ada item.</div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+            <Button size="sm" color="primary" className="w-full" onPress={() => onEdit(order.id)}>
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              color="success"
+              className="w-full"
+              onPress={() => onUpdateStatus(order.id, "completed")}
+            >
+              Selesai
+            </Button>
+            <Button
+              size="sm"
+              color="danger"
+              variant="flat"
+              className="w-full"
+              onPress={() => onUpdateStatus(order.id, "cancelled")}
+            >
+              Batal
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
     ))}
   </div>
 );
 
-// ===== Halaman Utama
-const BaristaPage = () => {
-  const { user, logout } = useAuth();
+/* ============================== Main page ============================== */
+export default function BaristaPage() {
+  const { user, loading, logout } = useAuth(); // <- pastikan context menyediakan `loading`
   const { profile } = useProfile();
   const navigate = useNavigate();
 
@@ -263,13 +313,20 @@ const BaristaPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [customerName, setCustomerName] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'' | PaymentMethod>(''); // NEW
+  const [customerName, setCustomerName] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"" | PaymentMethod>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pendingOrders, setPendingOrders] = useState<PendingOrderWithItems[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrderWithItems[]>(
+    []
+  );
 
-  // Ringkasan penjualan HARI INI (completed saja) untuk barista login
-  const [todaySummary, setTodaySummary] = useState({ total: 0, count: 0, cash: 0, qris: 0 });
+  // Ringkasan hari ini utk barista login
+  const [todaySummary, setTodaySummary] = useState({
+    total: 0,
+    count: 0,
+    cash: 0,
+    qris: 0,
+  });
 
   // UI
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -294,15 +351,15 @@ const BaristaPage = () => {
     end.setHours(23, 59, 59, 999);
 
     const { data, error } = await supabase
-      .from('orders')
-      .select('total_amount,payment_method,created_at')
-      .eq('created_by', user.id) // barista sekarang
-      .eq('status', 'completed')
-      .gte('created_at', start.toISOString())
-      .lte('created_at', end.toISOString());
+      .from("orders")
+      .select("total_amount,payment_method,created_at")
+      .eq("created_by", user.id)
+      .eq("status", "completed")
+      .gte("created_at", start.toISOString())
+      .lte("created_at", end.toISOString());
 
     if (error) {
-      console.error('Gagal ambil ringkasan hari ini:', error);
+      console.error("Gagal ambil ringkasan hari ini:", error);
       return;
     }
 
@@ -314,8 +371,8 @@ const BaristaPage = () => {
       const v = Number(r.total_amount) || 0;
       total += v;
       count++;
-      if (r.payment_method === 'cash') cash += v;
-      else if (r.payment_method === 'qris') qris += v;
+      if (r.payment_method === "cash") cash += v;
+      else if (r.payment_method === "qris") qris += v;
     });
     setTodaySummary({ total, count, cash, qris });
   }, [user?.id]);
@@ -327,16 +384,18 @@ const BaristaPage = () => {
       if (categories.length > 0) setActiveCategory(categories[0].id);
     });
 
-    const ch = supabase.channel('orders-channel', { config: { broadcast: { self: true } } });
+    const ch = supabase.channel("orders-channel", {
+      config: { broadcast: { self: true } },
+    });
     channelRef.current = ch;
 
-    ch.on('broadcast', { event: 'orders_updated' }, () => {
+    ch.on("broadcast", { event: "orders_updated" }, () => {
       fetchPending();
       fetchTodaySummary();
     });
 
     ch.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
+      if (status === "SUBSCRIBED") {
         fetchPending();
         fetchTodaySummary();
       }
@@ -352,14 +411,18 @@ const BaristaPage = () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login", { replace: true });
   };
 
   const sendOrdersUpdated = useCallback(async (meta?: Record<string, unknown>) => {
     const ch = channelRef.current;
     if (!ch) return;
     try {
-      await ch.send({ type: 'broadcast', event: 'orders_updated', payload: { ts: Date.now(), ...(meta ?? {}) } });
+      await ch.send({
+        type: "broadcast",
+        event: "orders_updated",
+        payload: { ts: Date.now(), ...(meta ?? {}) },
+      });
     } catch {
       /* silent */
     }
@@ -374,7 +437,7 @@ const BaristaPage = () => {
           it.product ??
           products.find((pp) => pp.id === it.product_id) ?? {
             id: it.product_id,
-            name: 'Item',
+            name: "Item",
             price: it.price ?? 0,
             image_url: null,
             category_id: null as any,
@@ -388,8 +451,8 @@ const BaristaPage = () => {
           quantity: it.quantity ?? 1,
         } as CartItem;
       });
-      setCustomerName(detail?.customer_name ?? '');
-      setPaymentMethod((detail?.payment_method as PaymentMethod) ?? ''); // NEW: prefill
+      setCustomerName(detail?.customer_name ?? "");
+      setPaymentMethod((detail?.payment_method as PaymentMethod) ?? "");
       setCart(mapped);
       setEditingOrderId(orderId);
       setIsQueueOpen(false);
@@ -402,48 +465,60 @@ const BaristaPage = () => {
   const cancelEdit = () => {
     setEditingOrderId(null);
     setCart([]);
-    setCustomerName('');
-    setPaymentMethod('');
+    setCustomerName("");
+    setPaymentMethod("");
   };
 
   const handleSubmitOrder = async () => {
-    if (!user) return alert('Authentication error.');
-    if (!paymentMethod) return; // guard
+    if (!user) return alert("Authentication error.");
+    if (!paymentMethod) return;
     setIsSubmitting(true);
 
     try {
       if (editingOrderId) {
         await updateOrderAndItems(editingOrderId, {
           customer_name: customerName,
-          payment_method: paymentMethod, // NEW
+          payment_method: paymentMethod,
           items: cart.map((c) => ({ product_id: c.id, quantity: c.quantity })),
         });
       } else {
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        await createOrder(cart, customerName, total, user, paymentMethod); // NEW
+        const total = cart.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+        await createOrder(cart, customerName, total, user, paymentMethod);
       }
 
-      await sendOrdersUpdated({ source: editingOrderId ? 'update' : 'submit', orderId: editingOrderId ?? undefined });
-      await fetchTodaySummary(); // refresh ringkasan instan
+      await sendOrdersUpdated({
+        source: editingOrderId ? "update" : "submit",
+        orderId: editingOrderId ?? undefined,
+      });
+      await fetchTodaySummary();
 
       setIsCartOpen(false);
       setIsQueueOpen(true);
       setCart([]);
-      setCustomerName('');
-      setPaymentMethod('');
+      setCustomerName("");
+      setPaymentMethod("");
       setEditingOrderId(null);
     } catch (error: any) {
-      alert((editingOrderId ? 'Gagal mengupdate order: ' : 'Error placing order: ') + error.message);
+      alert(
+        (editingOrderId ? "Gagal mengupdate order: " : "Error placing order: ") +
+          error.message
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleUpdateStatus = async (orderId: number, status: 'completed' | 'cancelled') => {
+  const handleUpdateStatus = async (
+    orderId: number,
+    status: "completed" | "cancelled"
+  ) => {
     try {
       await updateOrderStatus(orderId, status);
-      await sendOrdersUpdated({ source: 'status', orderId, status });
-      await fetchTodaySummary(); // refresh ringkasan instan
+      await sendOrdersUpdated({ source: "status", orderId, status });
+      await fetchTodaySummary();
       if (editingOrderId === orderId) cancelEdit();
     } catch (error: any) {
       alert(`Gagal mengubah status order: ${error.message}`);
@@ -452,9 +527,11 @@ const BaristaPage = () => {
 
   const handleAddToCart = (product: Product) => {
     setCart((currentCart) => {
-      const existingItem = currentCart.find((item) => item.id === product.id);
-      if (existingItem) {
-        return currentCart.map((item) => (item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
+      const existing = currentCart.find((i) => i.id === product.id);
+      if (existing) {
+        return currentCart.map((i) =>
+          i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
+        );
       }
       return [...currentCart, { ...product, quantity: 1 }];
     });
@@ -462,21 +539,40 @@ const BaristaPage = () => {
 
   const handleUpdateQuantity = (productId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
-      handleRemoveFromCart(productId);
+      setCart((currentCart) => currentCart.filter((i) => i.id !== productId));
     } else {
       setCart((currentCart) =>
-        currentCart.map((item) => (item.id === productId ? { ...item, quantity: newQuantity } : item)),
+        currentCart.map((i) =>
+          i.id === productId ? { ...i, quantity: newQuantity } : i
+        )
       );
     }
-  };
-
-  const handleRemoveFromCart = (productId: number) => {
-    setCart((currentCart) => currentCart.filter((item) => item.id !== productId));
   };
 
   const filteredProducts = products.filter((p) => p.category_id === activeCategory);
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
   const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  /* ------------------------ AUTH GUARD DI HALAMAN ------------------------ */
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center gap-2">
+        <Spinner size="sm" /> Memulihkan sesi…
+      </div>
+    );
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  /* ---------------------------------------------------------------------- */
+
+  if (!products.length && !categories.length) {
+    return (
+      <div className="p-6 flex items-center gap-2">
+        <Spinner size="sm" /> Memuat menu…
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen min-h-0 bg-gray-50">
@@ -484,97 +580,139 @@ const BaristaPage = () => {
       <header className="bg-white shadow-sm p-4 flex justify-between items-center flex-shrink-0">
         <div>
           <h1 className="text-xl font-bold">Halaman Barista</h1>
-          <p className="text-sm text-gray-600">Logged in as: {profile?.full_name || user?.email}</p>
+          <p className="text-sm text-default-500">
+            Logged in as: {profile?.full_name || user?.email}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIsQueueOpen(true)} className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600">
+          <Button color="warning" onPress={() => setIsQueueOpen(true)}>
             Queue ({pendingOrders.length})
-          </button>
-          <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600">
+          </Button>
+          <Button color="danger" onPress={handleLogout}>
             Logout
-          </button>
+          </Button>
         </div>
       </header>
 
       {/* Konten utama */}
       <div className="flex-grow min-h-0 pb-16 md:pb-0">
         <div className="flex h-full">
-          {/* SIDEBAR RINGKASAN — kiri (desktop lg+) */}
+          {/* Sidebar ringkasan (desktop) */}
           <aside className="hidden lg:block w-64 flex-shrink-0 border-r bg-white p-4">
-            <h3 className="font-semibold text-sm text-gray-700">Ringkasan Hari Ini</h3>
+            <h3 className="font-semibold text-sm text-default-700">
+              Ringkasan Hari Ini
+            </h3>
             <div className="mt-3 space-y-3">
-              <div className="p-3 rounded-lg border bg-gradient-to-br from-indigo-50 to-white">
-                <div className="text-xs text-gray-500">Total Completed</div>
-                <div className="text-2xl font-bold">{fmtIDR(todaySummary.total)}</div>
-                <div className="text-xs text-gray-500 mt-1">{todaySummary.count} order</div>
-              </div>
+              <Card>
+                <CardBody>
+                  <div className="text-xs text-default-500">Total Completed</div>
+                  <div className="text-2xl font-bold">{fmtIDR(todaySummary.total)}</div>
+                  <div className="text-xs text-default-500 mt-1">
+                    {todaySummary.count} order
+                  </div>
+                </CardBody>
+              </Card>
               <div className="grid grid-cols-2 gap-2">
-                <div className="p-2 rounded border">
-                  <div className="text-xs text-gray-500">CASH</div>
-                  <div className="font-semibold">{fmtIDR(todaySummary.cash)}</div>
-                </div>
-                <div className="p-2 rounded border">
-                  <div className="text-xs text-gray-500">QRIS</div>
-                  <div className="font-semibold">{fmtIDR(todaySummary.qris)}</div>
-                </div>
+                <Card>
+                  <CardBody>
+                    <div className="text-xs text-default-500">CASH</div>
+                    <div className="font-semibold">{fmtIDR(todaySummary.cash)}</div>
+                  </CardBody>
+                </Card>
+                <Card>
+                  <CardBody>
+                    <div className="text-xs text-default-500">QRIS</div>
+                    <div className="font-semibold">{fmtIDR(todaySummary.qris)}</div>
+                  </CardBody>
+                </Card>
               </div>
             </div>
           </aside>
 
           {/* MENU */}
           <section className="flex-1 min-h-0 overflow-y-auto p-4">
-            {/* Ringkasan kecil untuk mobile/tablet */}
+            {/* Ringkasan kecil mobile */}
             <div className="lg:hidden grid grid-cols-2 gap-2 mb-4">
-              <div className="p-3 rounded-lg border bg-white">
-                <div className="text-xs text-gray-500">Total Today</div>
-                <div className="text-lg font-bold">{fmtIDR(todaySummary.total)}</div>
-                <div className="text-xs text-gray-500">{todaySummary.count} order</div>
-              </div>
-              <div className="p-3 rounded-lg border bg-white">
-                <div className="text-xs text-gray-500">Cash / QRIS</div>
-                <div className="text-sm font-semibold leading-tight">
-                  {fmtIDR(todaySummary.cash)} / {fmtIDR(todaySummary.qris)}
-                </div>
-              </div>
+              <Card>
+                <CardBody>
+                  <div className="text-xs text-default-500">Total Today</div>
+                  <div className="text-lg font-bold">{fmtIDR(todaySummary.total)}</div>
+                  <div className="text-xs text-default-500">
+                    {todaySummary.count} order
+                  </div>
+                </CardBody>
+              </Card>
+              <Card>
+                <CardBody>
+                  <div className="text-xs text-default-500">Cash / QRIS</div>
+                  <div className="text-sm font-semibold leading-tight">
+                    {fmtIDR(todaySummary.cash)} / {fmtIDR(todaySummary.qris)}
+                  </div>
+                </CardBody>
+              </Card>
             </div>
 
             {/* Kategori */}
             <div className="mb-4 flex-shrink-0 flex flex-wrap gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`px-4 py-2 rounded ${activeCategory === cat.id ? 'bg-indigo-600 text-white' : 'bg-white'}`}
-                >
-                  {cat.name}
-                </button>
-              ))}
+              {categories.map((cat) => {
+                const active = activeCategory === cat.id;
+                return (
+                  <Button
+                    key={cat.id}
+                    size="sm"
+                    variant={active ? "solid" : "flat"}
+                    color={active ? "primary" : "default"}
+                    onPress={() => setActiveCategory(cat.id)}
+                  >
+                    {cat.name}
+                  </Button>
+                );
+              })}
             </div>
 
             {/* Produk */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
               {filteredProducts.map((product) => (
-                <div key={product.id} className="bg-white rounded-lg shadow p-3 text-center flex flex-col">
-                  <img
-                    src={product.image_url || 'https://placehold.co/150x100/e2e8f0/e2e8f0?text=No-Image'}
-                    alt={product.name}
-                    className="w-full h-24 object-cover rounded-md mb-2"
-                  />
-                  <p className="font-bold text-sm truncate">{product.name}</p>
-                  <p className="text-xs text-gray-600 mb-2">{new Intl.NumberFormat('id-ID').format(product.price)}</p>
-                  <button
-                    onClick={() => handleAddToCart(product)}
-                    className="mt-auto bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700"
-                  >
-                    Tambah
-                  </button>
-                </div>
+                <Card key={product.id} shadow="sm" className="text-center">
+                  <CardBody className="flex flex-col">
+                    <img
+                      src={
+                        product.image_url ||
+                        "https://placehold.co/150x100/e2e8f0/e2e8f0?text=No-Image"
+                      }
+                      alt={product.name}
+                      className="w-full h-24 object-cover rounded-md mb-2"
+                    />
+                    <p className="font-bold text-sm truncate">{product.name}</p>
+                    <p className="text-xs text-default-500 mb-2">
+                      {new Intl.NumberFormat("id-ID").format(product.price)}
+                    </p>
+                    <Button
+                      className="mt-auto"
+                      color="primary"
+                      onPress={() => {
+                        setCart((prev) => {
+                          const ex = prev.find((i) => i.id === product.id);
+                          if (ex)
+                            return prev.map((i) =>
+                              i.id === product.id
+                                ? { ...i, quantity: i.quantity + 1 }
+                                : i
+                            );
+                          return [...prev, { ...product, quantity: 1 }];
+                        });
+                      }}
+                    >
+                      Tambah
+                    </Button>
+                  </CardBody>
+                </Card>
               ))}
             </div>
           </section>
 
           {/* CART desktop (sidebar kanan) */}
-          <aside className="hidden md:block w-full md:w-80 lg:w-96 max-w-md flex-shrink-0 border-l">
+          <aside className="hidden md:block w-full md:w-80 lg:w-96 max-w-md flex-shrink-0 border-l p-4">
             <OrderCart
               cart={cart}
               customerName={customerName}
@@ -583,8 +721,17 @@ const BaristaPage = () => {
               onCustomerNameChange={setCustomerName}
               onPaymentMethodChange={setPaymentMethod}
               onSubmit={handleSubmitOrder}
-              onUpdateQuantity={handleUpdateQuantity}
-              onRemoveItem={handleRemoveFromCart}
+              onUpdateQuantity={(id, q) => {
+                if (q <= 0)
+                  setCart((c) => c.filter((i) => i.id !== id));
+                else
+                  setCart((c) =>
+                    c.map((i) => (i.id === id ? { ...i, quantity: q } : i))
+                  );
+              }}
+              onRemoveItem={(id) =>
+                setCart((c) => c.filter((i) => i.id !== id))
+              }
               isEditing={editingOrderId !== null}
               onCancelEdit={cancelEdit}
             />
@@ -592,69 +739,104 @@ const BaristaPage = () => {
         </div>
       </div>
 
-      {/* Sticky bar mobile untuk buka Cart */}
+      {/* Sticky bar mobile */}
       <div className="md:hidden sticky bottom-0 left-0 right-0 bg-white border-t p-3">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className="flex-1 bg-indigo-600 text-white py-3 rounded-md font-semibold"
+          <Button
+            className="flex-1"
+            color="primary"
+            onPress={() => setIsCartOpen(true)}
           >
-            {editingOrderId ? 'Edit Order' : 'Cart'} ({totalItems}) • {fmtIDR(totalPrice)}
-          </button>
-          <button onClick={() => setIsQueueOpen(true)} className="px-4 py-3 rounded-md bg-yellow-500 text-white font-semibold">
+            {editingOrderId ? "Edit Order" : "Cart"} ({totalItems}) •{" "}
+            {fmtIDR(totalPrice)}
+          </Button>
+          <Button color="warning" onPress={() => setIsQueueOpen(true)}>
             Queue
-          </button>
+          </Button>
         </div>
       </div>
 
       <footer className="bg-white border-t w-full flex items-center justify-center py-3">
-        <Link isExternal className="flex items-center gap-1 text-current" href="https://www.instagram.com/zidni_mufti/">
+        <HeroLink
+          isExternal
+          className="flex items-center gap-1 text-current"
+          href="https://www.instagram.com/zidni_mufti/"
+        >
           <span className="text-default-600">Powered by</span>
           <p className="text-primary">Orang Ganteng</p>
-        </Link>
+        </HeroLink>
       </footer>
 
-      {/* MOBILE: Bottom Sheet Cart (FIX: tinggi pasti + flex kolom) */}
-      {isCartOpen && (
-        <div className="md:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setIsCartOpen(false)} />
-          <div className="absolute left-0 right-0 bottom-0 h-[85dvh] bg-white rounded-t-2xl shadow-lg overflow-hidden flex flex-col">
-            <OrderCart
-              cart={cart}
-              customerName={customerName}
-              paymentMethod={paymentMethod}
-              isSubmitting={isSubmitting}
-              onCustomerNameChange={setCustomerName}
-              onPaymentMethodChange={setPaymentMethod}
-              onSubmit={handleSubmitOrder}
-              onUpdateQuantity={handleUpdateQuantity}
-              onRemoveItem={handleRemoveFromCart}
-              onClose={() => setIsCartOpen(false)}
-              showClose
-              isEditing={editingOrderId !== null}
-              onCancelEdit={cancelEdit}
-            />
-          </div>
-        </div>
-      )}
+      {/* Bottom Sheet Cart (mobile) */}
+      <Modal
+        isOpen={isCartOpen}
+        onOpenChange={(open) => {
+          if (!open) setIsCartOpen(false);
+        }}
+        placement="bottom"
+        hideCloseButton
+      >
+        <ModalContent className="h-[85dvh]">
+          <Card className="rounded-none h-full">
+            <CardBody className="h-full overflow-hidden">
+              <OrderCart
+                cart={cart}
+                customerName={customerName}
+                paymentMethod={paymentMethod}
+                isSubmitting={isSubmitting}
+                onCustomerNameChange={setCustomerName}
+                onPaymentMethodChange={setPaymentMethod}
+                onSubmit={handleSubmitOrder}
+                onUpdateQuantity={(id, q) => {
+                  if (q <= 0)
+                    setCart((c) => c.filter((i) => i.id !== id));
+                  else
+                    setCart((c) =>
+                      c.map((i) => (i.id === id ? { ...i, quantity: q } : i))
+                    );
+                }}
+                onRemoveItem={(id) =>
+                  setCart((c) => c.filter((i) => i.id !== id))
+                }
+                onClose={() => setIsCartOpen(false)}
+                showClose
+                isEditing={editingOrderId !== null}
+                onCancelEdit={cancelEdit}
+              />
+            </CardBody>
+          </Card>
+        </ModalContent>
+      </Modal>
 
-      {/* Queue Modal */}
-      {isQueueOpen && (
-        <div className="fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setIsQueueOpen(false)} />
-          <div className="absolute inset-x-0 md:inset-auto md:right-6 md:left-6 top-10 bottom-10 bg-white rounded-xl shadow-xl p-4 overflow-y-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-lg">Pending Orders Queue ({pendingOrders.length})</h3>
-              <button onClick={() => setIsQueueOpen(false)} className="px-3 py-1 rounded bg-gray-100">
+      {/* Pending Orders Modal (tanpa ikon X) */}
+      <Modal
+        isOpen={isQueueOpen}
+        onOpenChange={(open) => {
+          if (!open) setIsQueueOpen(false);
+        }}
+        size="4xl"
+        placement="center"
+        scrollBehavior="inside"
+        hideCloseButton
+      >
+        <ModalContent>
+          <>
+            <ModalHeader className="justify-between">
+              <span>Pending Orders Queue ({pendingOrders.length})</span>
+              <Button size="sm" variant="flat" onPress={() => setIsQueueOpen(false)}>
                 Tutup
-              </button>
-            </div>
-            <PendingOrdersList orders={pendingOrders} onUpdateStatus={handleUpdateStatus} onEdit={handleEditStart} />
-          </div>
-        </div>
-      )}
+              </Button>
+            </ModalHeader>
+            <ModalBody>
+              <PendingOrdersList
+                orders={pendingOrders}
+                onUpdateStatus={handleUpdateStatus}
+                onEdit={handleEditStart}
+              />
+            </ModalBody>
+          </>
+        </ModalContent>
+      </Modal>
     </div>
   );
-};
-
-export default BaristaPage;
+}

@@ -1,20 +1,34 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Spinner } from "@heroui/react";
+import { useAuth } from "../hooks/useAuth";
 
+/**
+ * ProtectedRoute
+ * - Menunggu pemulihan sesi (loading) sebelum memutuskan redirect.
+ * - Kompatibel dengan context yang memakai "loading" atau "isLoading".
+ */
 const ProtectedRoute = () => {
-  const { user, isLoading } = useAuth();
+  // kompatibel dengan 2 nama properti
+  const auth = useAuth() as any;
+  const user = auth?.user ?? null;
+  const loading =
+    typeof auth?.loading === "boolean" ? auth.loading : !!auth?.isLoading;
 
-  // Tampilkan loading HANYA saat sesi awal sedang diperiksa.
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading Session...</div>;
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center gap-2">
+        <Spinner size="sm" /> Memulihkan sesi…
+      </div>
+    );
   }
 
-  // Setelah selesai, jika tidak ada user, arahkan ke login.
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // simpan lokasi asal agar bisa kembali setelah login
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // Jika ada user, izinkan akses.
   return <Outlet />;
 };
 

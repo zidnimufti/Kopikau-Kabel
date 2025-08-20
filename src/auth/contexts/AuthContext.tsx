@@ -1,53 +1,78 @@
-import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../../api/supabaseClient'; // Sesuaikan path
+// src/auth/contexts/AuthContext.tsx
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { supabase } from "../../api/supabaseClient";
 
-interface AuthContextType {
-  session: Session | null;
+type AuthContextType = {
   user: User | null;
-  isLoading: boolean; // Status loading untuk sesi awal
+  loading: boolean;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-}
+};
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // <- default TRUE, supaya tidak ada flicker
 
+  // Boot: pulihkan sesi + subscribe perubahan
   useEffect(() => {
-    // onAuthStateChange adalah satu-satunya sumber kebenaran kita.
-    // Ia akan berjalan saat aplikasi dimuat dan setiap kali status login berubah.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    let mounted = true;
+
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!mounted) return;
+        setUser(data.session?.user ?? null);
+      } finally {
+        if (mounted) setLoading(false); // hanya dimatikan setelah getSession selesai
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      setIsLoading(false); // Selesai loading setelah status auth awal diketahui
+      setLoading(false);
     });
 
-    // Cleanup listener
     return () => {
-      subscription.unsubscribe();
+      mounted = false;
+      sub.subscription.unsubscribe();
     };
   }, []);
 
-  const logout = async () => {
-    await supabase.auth.signOut();
+  const signInWithPassword = async (email: string, password: string) => {
+    setLoading(true);
+    const { error, data } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      setLoading(false);
+      throw error;
+    }
+    setUser(data.user ?? null);
+    setLoading(false);
   };
 
-  const value = { session, user, isLoading, logout };
+  const logout = async () => {
+    setLoading(true);
+    // Logout lokal sudah cukup untuk SPA; global dapat memicu 403 bila tidak pakai cookie auth server.
+    await supabase.auth.signOut().catch(() => {});
+    setUser(null);
+    setLoading(false);
+  };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({ user, loading, signInWithPassword, logout }),
+    [user, loading]
   );
-};
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuthContext() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuthContext must be used within AuthProvider");
+  return ctx;
+}

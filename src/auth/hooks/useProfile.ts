@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../api/supabaseClient'; // Sesuaikan path
 import { UserProfile } from '../../types'; // Sesuaikan path
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from './useAuth';
 
 export const useProfile = () => {
   const { user } = useAuth();

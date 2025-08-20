@@ -1,26 +1,40 @@
-import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useProfile } from '../hooks/useProfile';
+import { ReactNode } from "react";
+import { Navigate } from "react-router-dom";
+import { Spinner } from "@heroui/react";
+import { useProfile } from "../hooks/useProfile";
+import { useAuth } from "../hooks/useAuth";
 
 interface RoleGuardProps {
   allowedRoles: string[];
   children: ReactNode;
+  redirectTo?: string; // default ke /app/barista
 }
 
-const RoleGuard = ({ allowedRoles, children }: RoleGuardProps) => {
+/**
+ * RoleGuard
+ * - Menunggu auth.loading dan loadingProfile sebelum evaluasi role.
+ * - Jika role tidak cocok -> redirect ke redirectTo (default: /app/barista).
+ * - Aman dipakai sendiri ataupun di dalam ProtectedRoute.
+ */
+const RoleGuard = ({ allowedRoles, children, redirectTo = "/app/barista" }: RoleGuardProps) => {
+  const auth = useAuth() as any;
+  const authLoading =
+    typeof auth?.loading === "boolean" ? auth.loading : !!auth?.isLoading;
+
   const { profile, loadingProfile } = useProfile();
 
-  // Tampilkan loading saat profil sedang diambil.
-  if (loadingProfile) {
-    return <div className="flex items-center justify-center h-screen">Checking Permissions...</div>;
+  if (authLoading || loadingProfile) {
+    return (
+      <div className="h-screen flex items-center justify-center gap-2">
+        <Spinner size="sm" /> Checking permissions…
+      </div>
+    );
   }
 
-  // Setelah selesai, periksa peran.
   if (!profile || !allowedRoles.includes(profile.role)) {
-    return <Navigate to="/app/barista" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
-  // Jika peran sesuai, izinkan akses.
   return <>{children}</>;
 };
 
