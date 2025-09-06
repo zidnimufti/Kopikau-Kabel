@@ -19,6 +19,7 @@ import BaristaDetailPage from './pages/admin/BaristaDetailPage';
 import OrderHistoryPage from './pages/admin/OrderHistoryPage';
 import InventoryPage from './pages/admin/Inventory';
 
+
 const PublicLayout = () => (
   <main>
     <Outlet />

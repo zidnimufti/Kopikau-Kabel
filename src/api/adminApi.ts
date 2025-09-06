@@ -1,20 +1,11 @@
 // src/api/adminApi.ts
+import {  DetailedOrder } from '@/types';
 import { supabase } from '../api/supabaseClient';
 
 /** ===== Types shared with UI ===== */
 export type OrderStatus = 'pending' | 'completed' | 'cancelled';
 export type PaymentMethod = 'cash' | 'qris' | null;
 
-export interface DetailedOrder {
-  order_id: number;
-  created_at: string;
-  customer_name: string;
-  total_amount: number;
-  status: OrderStatus;
-  barista_name: string;
-  payment_method?: 'cash' | 'qris' | null;
-  items: { product_name: string; quantity: number; subtotal: number }[];
-}
 
 /** Dashboard summary (revenue dari completed + total orders apapun statusnya) */
 export const getDashboardSummary = async (): Promise<{
@@ -53,7 +44,7 @@ export const getBaristas = async () => {
 
   // Fallback sederhana (silakan sesuaikan kolomnya)
   const { data: fallback, error: fbErr } = await supabase
-    .from('profiles')
+    .from('users')
     .select('id, full_name')
     .order('full_name', { ascending: true });
 
@@ -95,32 +86,83 @@ export const getBaristaSalesDetails = async (
  * ganti 'orders_created_by_fkey' sesuai yang ada di Supabase.
  */
 export const getAllOrders = async (): Promise<DetailedOrder[]> => {
-  const { data, error } = await supabase.rpc('get_all_orders_with_details');
-  if (error) {
-    // Jika gagal karena alias FK, beri pesan yang memudahkan debugging
-    console.error(
-      'getAllOrders select error. Cek nama FK join ke profiles (orders_created_by_fkey).',
-      error
-    );
-    throw error;
-  }
+  try {
+    // First try using the RPC function if available
+    const { data, error } = await supabase.rpc("get_all_orders_with_details");
+    if (error) throw error;
+
+    return (data ?? []).map((row: any) => ({
+      order_id: row.order_id,
+      created_at: row.created_at,
+      customer_name: row.customer_name,
+      total_amount: Number(row.total_amount) || 0,
+      status: row.status,
+      barista_name: row.barista_name || '—', // Use fallback if null
+      payment_method: row.payment_method as "cash" | "qris" | null,
+      items: Array.isArray(row.items)
+        ? row.items.map((it: any) => ({
+            product_name: it.product_name,
+            quantity: Number(it.quantity) || 0,
+            size: (it.size as "regular" | "large" | null) ?? "regular", // Default to regular if null
+            subtotal: Number(it.subtotal) || 0,
+          }))
+        : [],
+    }));
+  } catch (rpcError) {
+    console.error("Error getting orders with RPC, falling back to manual query:", rpcError);
     
-  return (data ?? []).map((row: any) => ({
-    order_id: row.order_id,
-    created_at: row.created_at,
-    customer_name: row.customer_name,
-    total_amount: Number(row.total_amount) || 0,
-    status: row.status,
-    barista_name: row.barista_name ?? '—', // jika full_name kosong, tampilkan strip
-    payment_method: row.payment_method as 'cash' | 'qris' | null,
-    items: Array.isArray(row.items)
-      ? row.items.map((it: any) => ({
-          product_name: it.product_name,
-          quantity: Number(it.quantity) || 0,
-          subtotal: Number(it.subtotal) || 0,
-        }))
-      : [],
-  }));
+    // FALLBACK: Manual query with join to get the data directly
+    try {
+      // First get all orders
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (ordersError) throw ordersError;
+      
+      // Process orders
+      const result: DetailedOrder[] = [];
+      
+      for (const order of orders || []) {
+        // For each order, get its items
+        const { data: items, error: itemsError } = await supabase
+          .from('order_items')
+          .select('*, products(name)')
+          .eq('order_id', order.id);
+          
+        if (itemsError) console.error("Error fetching items for order", order.id, itemsError);
+        
+        // Always use dash as fallback for barista name since we can't access auth.users
+        let baristaName = '—';
+        
+        // Map the items
+        const mappedItems = (items || []).map((item: any) => ({
+          product_name: item.products?.name || `Product #${item.product_id}`,
+          quantity: Number(item.quantity) || 0,
+          size: (item.size as "regular" | "large") || "regular",
+          subtotal: Number(item.subtotal) || 0
+        }));
+        
+        // Add this order to results
+        result.push({
+          order_id: order.id,
+          created_at: order.created_at,
+          customer_name: order.customer_name,
+          total_amount: Number(order.total_amount) || 0,
+          status: order.status,
+          barista_name: baristaName,
+          payment_method: order.payment_method as "cash" | "qris" | null,
+          items: mappedItems
+        });
+      }
+      
+      return result;
+    } catch (fallbackError) {
+      console.error("Fallback query also failed:", fallbackError);
+      throw fallbackError;
+    }
+  }
 };
 
 /**

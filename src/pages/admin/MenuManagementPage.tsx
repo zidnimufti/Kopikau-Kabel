@@ -1,5 +1,3 @@
-// MenuManagementPage.tsx (HeroUI)
-
 import { useState, useEffect } from "react";
 import {
   uploadProductImage,
@@ -166,6 +164,12 @@ const MenuManagementPage = () => {
                       style: "currency",
                       currency: "IDR",
                     }).format(product.price)}
+                    {product.price_large
+                      ? ` / Large: ${new Intl.NumberFormat("id-ID", {
+                          style: "currency",
+                          currency: "IDR",
+                        }).format(product.price_large)}`
+                      : ""}
                   </span>
                 </div>
                 <div className="mt-3 flex gap-2">
@@ -232,10 +236,24 @@ const MenuManagementPage = () => {
                     </Chip>
                   </TableCell>
                   <TableCell>
-                    {new Intl.NumberFormat("id-ID", {
-                      style: "currency",
-                      currency: "IDR",
-                    }).format(product.price)}
+                    <div>
+                      <div>
+                        {new Intl.NumberFormat("id-ID", {
+                          style: "currency",
+                          currency: "IDR",
+                        }).format(product.price)}{" "}
+                        (Regular)
+                      </div>
+                      {product.price_large && (
+                        <div className="text-default-500 text-sm">
+                          Large:{" "}
+                          {new Intl.NumberFormat("id-ID", {
+                            style: "currency",
+                            currency: "IDR",
+                          }).format(product.price_large)}
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button
@@ -265,7 +283,6 @@ const MenuManagementPage = () => {
       <Modal
         isOpen={isModalOpen}
         onOpenChange={(open) => {
-          // close via backdrop/esc
           if (!open) handleCloseModal();
         }}
         placement="center"

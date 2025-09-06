@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { Category, Product, CartItem, Order } from "../../types";
+import { Category, Product, CartItem, Order, PendingOrderWithItems } from "../../types";
 import {
   getActiveMenu,
   createOrder,
@@ -158,7 +158,7 @@ const OrderCart = ({
               {cart.map((item) => (
                 <li key={item.id} className="py-3">
                   <div className="flex justify-between items-center gap-3">
-                    <p className="font-medium break-words">{item.name}</p>
+                    <p className="font-medium break-words">{item.name} ({item.size === "large" ? "Large" : "Regular"})</p>
                     <p className="font-semibold">
                       {new Intl.NumberFormat("id-ID").format(
                         item.price * item.quantity
@@ -231,11 +231,11 @@ const OrderCart = ({
 };
 
 /* ========================= Pending orders list ========================= */
-type PendingOrderWithItems = Order & {
+/*type PendingOrderWithItems = Order & {
   payment_method?: PaymentMethod;
   items?: { product_id: number; quantity: number; product?: Product }[];
 };
-
+*/
 const PendingOrdersList = ({
   orders,
   onUpdateStatus,
@@ -263,10 +263,12 @@ const PendingOrdersList = ({
           <div className="text-sm text-default-700 space-y-1">
             {(order.items ?? []).map((it) => (
               <div
-                key={`${order.id}-${it.product_id}`}
+                key={`${order.id}-${it.product_id}-${it.size}`}
                 className="flex justify-between"
               >
-                <span className="truncate">{it.product?.name ?? "Item"}</span>
+                <span className="truncate">
+                  {(it.product?.name ?? "Item")} ({it.size})
+                </span>
                 <span className="ml-2 font-medium">×{it.quantity}</span>
               </div>
             ))}
@@ -276,7 +278,12 @@ const PendingOrdersList = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
-            <Button size="sm" color="primary" className="w-full" onPress={() => onEdit(order.id)}>
+            <Button
+              size="sm"
+              color="primary"
+              className="w-full"
+              onPress={() => onEdit(order.id)}
+            >
               Edit
             </Button>
             <Button
@@ -303,6 +310,7 @@ const PendingOrdersList = ({
   </div>
 );
 
+
 /* ============================== Main page ============================== */
 export default function BaristaPage() {
   const { user, loading, logout } = useAuth(); // <- pastikan context menyediakan `loading`
@@ -316,9 +324,8 @@ export default function BaristaPage() {
   const [customerName, setCustomerName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"" | PaymentMethod>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pendingOrders, setPendingOrders] = useState<PendingOrderWithItems[]>(
-    []
-  );
+  const [pendingOrders, setPendingOrders] = useState<PendingOrderWithItems[]>([]);
+
 
   // Ringkasan hari ini utk barista login
   const [todaySummary, setTodaySummary] = useState({
@@ -339,9 +346,38 @@ export default function BaristaPage() {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchPending = useCallback(async () => {
-    const data = await getPendingOrdersWithItems();
-    setPendingOrders(data ?? []);
-  }, []);
+  const data = await getPendingOrdersWithItems();
+
+const transformed: Order[] = (data ?? []).map(order => ({
+  ...order,
+  payment_method: order.payment_method ?? null,
+  items: order.items?.map(item => ({
+    product_id: item.product_id,
+    quantity: item.quantity,
+    size: item.size ?? "regular",
+    subtotal: item.subtotal ?? ((item.product?.price ?? 0) * item.quantity),
+    product: item.product
+      ? {
+          id: item.product.id,
+          name: item.product.name,
+          description: item.product.description,
+          price: item.product.price,
+          price_large: item.product.price_large,
+          image_url: item.product.image_url,
+          category_id: item.product.category_id,
+          size: null, // optional if your Product type requires it
+        }
+      : undefined,
+  })) ?? [],
+}));
+
+setPendingOrders(transformed);
+
+setPendingOrders(transformed);
+
+}, []);
+
+
 
   const fetchTodaySummary = useCallback(async () => {
     if (!user?.id) return;
@@ -479,7 +515,7 @@ export default function BaristaPage() {
         await updateOrderAndItems(editingOrderId, {
           customer_name: customerName,
           payment_method: paymentMethod,
-          items: cart.map((c) => ({ product_id: c.id, quantity: c.quantity })),
+          items: cart.map((c) => ({ product_id: c.id, quantity: c.quantity, size: c.size })),
         });
       } else {
         const total = cart.reduce(
@@ -510,6 +546,14 @@ export default function BaristaPage() {
       setIsSubmitting(false);
     }
   };
+
+  const [selectedSizes, setSelectedSizes] = useState<Record<number, "regular" | "large">>({});
+
+// handle size change
+const handleSizeChange = (productId: number, size: "regular" | "large") => {
+  setSelectedSizes((prev) => ({ ...prev, [productId]: size }));
+};
+
 
   const handleUpdateStatus = async (
     orderId: number,
@@ -671,42 +715,87 @@ export default function BaristaPage() {
 
             {/* Produk */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {filteredProducts.map((product) => (
-                <Card key={product.id} shadow="sm" className="text-center">
-                  <CardBody className="flex flex-col">
-                    <img
-                      src={
-                        product.image_url ||
-                        "https://placehold.co/150x100/e2e8f0/e2e8f0?text=No-Image"
-                      }
-                      alt={product.name}
-                      className="w-full h-24 object-cover rounded-md mb-2"
-                    />
-                    <p className="font-bold text-sm truncate">{product.name}</p>
-                    <p className="text-xs text-default-500 mb-2">
-                      {new Intl.NumberFormat("id-ID").format(product.price)}
-                    </p>
-                    <Button
-                      className="mt-auto"
-                      color="primary"
-                      onPress={() => {
-                        setCart((prev) => {
-                          const ex = prev.find((i) => i.id === product.id);
-                          if (ex)
-                            return prev.map((i) =>
-                              i.id === product.id
-                                ? { ...i, quantity: i.quantity + 1 }
-                                : i
-                            );
-                          return [...prev, { ...product, quantity: 1 }];
-                        });
-                      }}
-                    >
-                      Tambah
-                    </Button>
-                  </CardBody>
-                </Card>
-              ))}
+              {filteredProducts.map((product) => {
+                const size = selectedSizes[product.id] || "regular";
+
+                return (
+                  <Card key={product.id} shadow="sm" className="text-center">
+                    <CardBody className="flex flex-col">
+                      <img
+                        src={product.image_url || "https://placehold.co/150x100/e2e8f0/e2e8f0?text=No-Image"}
+                        alt={product.name}
+                        className="w-full h-24 object-cover rounded-md mb-2"
+                      />
+                      <p className="font-bold text-sm truncate">{product.name}</p>
+                      <p className="text-xs text-default-500 mb-2">
+                        {new Intl.NumberFormat("id-ID").format(
+                          size === "large" ? product.price_large ?? 0 : product.price ?? 0
+                        )}
+                      </p>
+
+                      {/* Size selection */}
+                      <div className="flex justify-center gap-2 mb-2">
+                        <label>
+                          <input
+                            type="radio"
+                            name={`size-${product.id}`}
+                            value="regular"
+                            checked={size === "regular"}
+                            onChange={() => handleSizeChange(product.id, "regular")}
+                          />
+                          Regular
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            name={`size-${product.id}`}
+                            value="large"
+                            checked={size === "large"}
+                            onChange={() => handleSizeChange(product.id, "large")}
+                          />
+                          Large
+                        </label>
+                      </div>
+
+                      <Button
+                        className="mt-auto"
+                        color="primary"
+                        onPress={() => {
+                          setCart((prev) => {
+                            const priceToUse =
+                              size === "large" && product.price_large
+                                ? product.price_large
+                                : product.price;
+
+                            const ex = prev.find((i) => i.id === product.id && i.size === size);
+                            if (ex) {
+                              return prev.map((i) =>
+                                i.id === product.id && i.size === size
+                                  ? { ...i, quantity: i.quantity + 1 }
+                                  : i
+                              );
+                            }
+                            return [
+                              ...prev,
+                              {
+                                ...product,
+                                quantity: 1,
+                                size,
+                                price: priceToUse, // ✅ overwrite price here
+                              } as CartItem,
+                            ];
+                          });
+                        }}
+                      >
+                        Tambah
+                      </Button>
+
+                    </CardBody>
+                  </Card>
+                );
+              })}
+
+
             </div>
           </section>
 
@@ -812,6 +901,7 @@ export default function BaristaPage() {
                 Tutup
               </Button>
             </ModalHeader>
+
             <ModalBody>
               <PendingOrdersList
                 orders={pendingOrders}
