@@ -65,6 +65,7 @@ export const ProductForm = ({
         price,
         price_large: priceLarge, // 🔹 ikut dikirim
         category_id: categoryId,
+        size: null // 🔹 tambahkan properti size dengan nilai null
       },
       imageFile
     );
