@@ -596,6 +596,7 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
   const filteredProducts = products.filter((p) => p.category_id === activeCategory);
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
   const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  
 
   /* ------------------------ AUTH GUARD DI HALAMAN ------------------------ */
   if (loading) {
@@ -717,7 +718,14 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
             {/* Produk */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
               {filteredProducts.map((product) => {
-                const size = selectedSizes[product.id] || "regular";
+                const selectedSize = selectedSizes[product.id] || "regular";
+                const basePrice =
+                  selectedSize === "large" && product.price_large
+                    ? product.price_large
+                    : product.price;
+                const finalPrice = product.discount
+                  ? Math.round(basePrice - (basePrice * product.discount) / 100)
+                  : basePrice;
 
                 return (
                   <Card key={product.id} shadow="sm" className="text-center">
@@ -729,8 +737,15 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
                       />
                       <p className="font-bold text-sm truncate">{product.name}</p>
                       <p className="text-xs text-default-500 mb-2">
-                        {new Intl.NumberFormat("id-ID").format(
-                          size === "large" ? product.price_large ?? 0 : product.price ?? 0
+                        {product.discount ? (
+                          <span className="text-red-500 font-semibold">
+                            {new Intl.NumberFormat("id-ID").format(finalPrice)}{" "}
+                            <span className="line-through text-gray-400 text-xs ml-1">
+                              {new Intl.NumberFormat("id-ID").format(basePrice)}
+                            </span>
+                          </span>
+                        ) : (
+                          new Intl.NumberFormat("id-ID").format(finalPrice)
                         )}
                       </p>
 
@@ -741,7 +756,7 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
                             type="radio"
                             name={`size-${product.id}`}
                             value="regular"
-                            checked={size === "regular"}
+                            checked={selectedSize === "regular"}
                             onChange={() => handleSizeChange(product.id, "regular")}
                           />
                           Regular
@@ -751,7 +766,7 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
                             type="radio"
                             name={`size-${product.id}`}
                             value="large"
-                            checked={size === "large"}
+                            checked={selectedSize === "large"}
                             onChange={() => handleSizeChange(product.id, "large")}
                           />
                           Large
@@ -763,15 +778,11 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
                         color="primary"
                         onPress={() => {
                           setCart((prev) => {
-                            const priceToUse =
-                              size === "large" && product.price_large
-                                ? product.price_large
-                                : product.price;
 
-                            const ex = prev.find((i) => i.id === product.id && i.size === size);
+                            const ex = prev.find((i) => i.id === product.id && i.size === selectedSize);
                             if (ex) {
                               return prev.map((i) =>
-                                i.id === product.id && i.size === size
+                                i.id === product.id && i.size === selectedSize
                                   ? { ...i, quantity: i.quantity + 1 }
                                   : i
                               );
@@ -781,8 +792,8 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
                               {
                                 ...product,
                                 quantity: 1,
-                                size,
-                                price: priceToUse, // ✅ overwrite price here
+                                size: selectedSize,
+                                price: finalPrice, // ✅ overwrite price here
                               } as CartItem,
                             ];
                           });
