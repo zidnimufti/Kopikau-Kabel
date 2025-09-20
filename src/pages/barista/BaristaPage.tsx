@@ -366,6 +366,7 @@ const transformed: Order[] = (data ?? []).map(order => ({
           image_url: item.product.image_url,
           category_id: item.product.category_id,
           size: null, // optional if your Product type requires it
+          discount: item.product.discount ?? null,
         }
       : undefined,
   })) ?? [],
