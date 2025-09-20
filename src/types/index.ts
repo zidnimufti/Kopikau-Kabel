@@ -34,6 +34,7 @@ export interface Product {
   category_id: number;
   price_large?: number;
   size: "regular" | "large" | null;
+  discount: number | null;
 }
 
 // =====================

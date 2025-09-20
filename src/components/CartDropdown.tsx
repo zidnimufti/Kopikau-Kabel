@@ -23,18 +23,20 @@ import {
 import { Icon } from "@iconify/react";
 import { useCart, PaymentMethod } from "../components/CartContext";
 import { generateQrisBase64 } from "@/components/qris";
+import { Product } from "../types";
 
 // Helper: ambil harga unit dari DB berdasarkan size
-function getUnitPriceFromDB(
-  product: { price: number; price_large?: number | null },
-  size: "regular" | "large"
-) {
-  if (size === "large") {
-    // fallback ke harga regular jika price_large belum tersedia
-    return product.price_large ?? product.price;
+function getUnitPriceFromDB(product: Product, size: "regular" | "large") {
+  const basePrice =
+    size === "large"
+      ? product.price_large ?? product.price
+      : product.price;
+
+  if (product.discount && product.discount > 0) {
+    return Math.round(basePrice * (1 - product.discount / 100));
   }
-  // size regular
-  return product.price;
+
+  return basePrice;
 }
 
 export const CartDropdown: React.FC = () => {
@@ -175,10 +177,6 @@ export const CartDropdown: React.FC = () => {
             <>
               {/* Daftar item */}
               {cartItems.map((item) => {
-                const unit = getUnitPriceFromDB(
-                  item.product as any,
-                  item.size
-                );
                 return (
                   <DropdownItem
                     key={`${item.product.id}-${item.size}`}
@@ -202,7 +200,24 @@ export const CartDropdown: React.FC = () => {
                         <p className="text-xs text-default-500">
                           Size: {item.size}
                           <br />
-                          Rp {unit.toLocaleString("id-ID")} x {item.quantity}
+                          {item.product.discount && item.product.discount > 0 ? (
+                            <>
+                              <span className="line-through text-red-400">
+                                Rp {(
+                                  (item.size === "large"
+                                    ? item.product.price_large ?? item.product.price
+                                    : item.product.price
+                                  ) * item.quantity
+                                ).toLocaleString("id-ID")}
+                              </span>
+                              {" "}
+                              <span className="text-green-500 font-bold">
+                                Rp {(getUnitPriceFromDB(item.product, item.size) * item.quantity).toLocaleString("id-ID")}
+                              </span>
+                            </>
+                          ) : (
+                            <>Rp {getUnitPriceFromDB(item.product, item.size).toLocaleString("id-ID")} x {item.quantity}</>
+                          )}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">

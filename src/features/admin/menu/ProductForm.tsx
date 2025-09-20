@@ -27,6 +27,8 @@ export const ProductForm = ({
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [discount, setDiscount] = useState<number | null>(null);
+
 
   useEffect(() => {
     if (initialData) {
@@ -35,6 +37,7 @@ export const ProductForm = ({
       setPrice(initialData.price);
       setPriceLarge(initialData.price_large || 0); // 🔹 load harga large
       setCategoryId(initialData.category_id);
+      setDiscount(initialData.discount ?? null); // ✅ load diskon
       setImagePreview(initialData.image_url || null);
     } else {
       setName("");
@@ -42,6 +45,7 @@ export const ProductForm = ({
       setPrice(0);
       setPriceLarge(0);
       setCategoryId("");
+      setDiscount(null); // ✅ reset diskon
       setImagePreview(null);
       setImageFile(null);
     }
@@ -65,7 +69,8 @@ export const ProductForm = ({
         price,
         price_large: priceLarge, // 🔹 ikut dikirim
         category_id: categoryId,
-        size: null // 🔹 tambahkan properti size dengan nilai null
+        size: null, // 🔹 tambahkan properti size dengan nilai null
+        discount: discount !== null ? Number(discount) : null,
       },
       imageFile
     );
@@ -144,6 +149,24 @@ export const ProductForm = ({
             type="number"
             value={priceLarge}
             onChange={(e) => setPriceLarge(Number(e.target.value))}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+
+        {/* Diskon */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Diskon (%)
+          </label>
+          <input
+            type="number"
+            step={0.1}
+            min="0"
+            max="100"
+            value={discount ?? ""}
+            onChange={(e) =>
+              setDiscount(e.target.value === "" ? null : Number(e.target.value))
+            }
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>

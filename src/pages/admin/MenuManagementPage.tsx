@@ -155,6 +155,14 @@ const MenuManagementPage = () => {
                 <div className="text-sm font-medium truncate">
                   {product.name}
                 </div>
+                {/* Tambahkan diskon */}
+                {product.discount ? (
+                  <div className="mt-1">
+                    <Chip size="sm" color="warning" variant="flat">
+                      Diskon {product.discount}%
+                    </Chip>
+                  </div>
+                ) : null}
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <Chip size="sm" color="success" variant="flat">
                     {product.categories?.name || "Uncategorized"}
@@ -211,6 +219,7 @@ const MenuManagementPage = () => {
               <TableColumn>Nama</TableColumn>
               <TableColumn>Kategori</TableColumn>
               <TableColumn>Harga</TableColumn>
+              <TableColumn>Diskon</TableColumn>
               <TableColumn className="text-right">Aksi</TableColumn>
             </TableHeader>
 
@@ -254,6 +263,15 @@ const MenuManagementPage = () => {
                         </div>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {product.discount ? (
+                      <Chip size="sm" color="warning" variant="flat">
+                        {product.discount}%
+                      </Chip>
+                    ) : (
+                      <span className="text-default-400 text-sm">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button
