@@ -27,19 +27,40 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
       } else {
         setCategories(data || []);
         if (data && data.length > 0) {
-          // Default ke Coffee kalau ada
           const coffeeCat = data.find((c) => c.name.toLowerCase() === "coffee");
-          if (coffeeCat) {
-            setSelectedCategory(coffeeCat.id);
-          } else {
-            // Kalau Coffee tidak ada, ambil kategori pertama
-            setSelectedCategory(data[0].id);
-          }
+          setSelectedCategory(coffeeCat ? coffeeCat.id : data[0].id);
         }
       }
     };
     fetchCategories();
   }, []);
+
+  // Intersection Observer untuk mendeteksi scroll dan mengubah Chip aktif
+  useEffect(() => {
+    const handleIntersect = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          // Ambil ID kategori dari id element html (contoh: "category-1" jadi 1)
+          const catId = parseInt(entry.target.id.replace("category-", ""));
+          setSelectedCategory(catId);
+        }
+      });
+    };
+
+    // Setting area deteksi (sedikit di atas layar agar transisi lebih natural)
+    const observer = new IntersectionObserver(handleIntersect, {
+      root: null,
+      rootMargin: "-20% 0px -70% 0px", 
+    });
+
+    // Observasi setiap elemen kategori
+    categories.forEach((cat) => {
+      const element = document.getElementById(`category-${cat.id}`);
+      if (element) observer.observe(element);
+    });
+
+    return () => observer.disconnect();
+  }, [categories, products]);
 
   const handleProductClick = (productId: number) => {
     history(`/product/${productId}`);
@@ -51,22 +72,31 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
     addToCart(product, selectedSize);
   };
 
-  // Filter produk berdasarkan kategori
-  const filteredProducts =
-    selectedCategory === null
-      ? []
-      : products.filter((p) => p.category_id === selectedCategory);
+  // Fungsi untuk scroll otomatis saat Chip diklik
+  const scrollToCategory = (categoryId: number) => {
+    setSelectedCategory(categoryId); // Update state langsung biar responsif
+    const element = document.getElementById(`category-${categoryId}`);
+    if (element) {
+      // Offset agar tidak tertutup sticky header
+      const y = element.getBoundingClientRect().top + window.scrollY - 100;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Tombol kategori */}
-      <div className="flex justify-center gap-3 mt-10 flex-wrap">
+      
+      {/* Tombol kategori (Sticky) 
+        Tambahkan background color (misal bg-white) sesuai tema Anda agar produk yang discroll lewat bawahnya tertutup dengan rapi.
+        Di sini saya pakai backdrop-blur agar terlihat modern.
+      */}
+      <div className="sticky top-[60px] z-40 bg-background/80 backdrop-blur-md py-4 mt-4 flex justify-center gap-3 flex-wrap">
         {categories.map((cat) => (
           <Chip
             key={cat.id}
             color={selectedCategory === cat.id ? "primary" : "default"}
             variant={selectedCategory === cat.id ? "solid" : "flat"}
-            onClick={() => setSelectedCategory(cat.id)}
+            onClick={() => scrollToCategory(cat.id)}
             className="cursor-pointer"
           >
             {cat.name}
@@ -74,101 +104,118 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
         ))}
       </div>
 
-      {/* Grid produk */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {filteredProducts.map((product) => {
-          const selectedSize = selectedSizes[product.id] || "regular";
-          const basePrice =
-            selectedSize === "large" && product.price_large
-              ? product.price_large
-              : product.price;
-          
-          const hasDiscount = product.discount !== null && product.discount > 0;
-          const discountedPrice = hasDiscount
-            ? Math.round(basePrice * (1 - (product.discount! / 100)))
-            : basePrice;
+      {/* Kontainer Utama Produk */}
+      <div className="flex flex-col gap-12">
+        {categories.map((cat) => {
+          // Ambil produk HANYA untuk kategori yang sedang di-loop
+          const catProducts = products.filter((p) => p.category_id === cat.id);
+
+          // Jika tidak ada produk di kategori ini, lewati (jangan render)
+          if (catProducts.length === 0) return null;
 
           return (
-            <Card
-              key={product.id}
-              className="border border-default-200 cursor-pointer"
-              onPress={() => handleProductClick(product.id)}
-            >
-              <CardBody className="p-0 overflow-hidden">
-                <div className="relative">
-                  {hasDiscount && (
-                    <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow">
-                      -{product.discount}%
-                    </span>
-                  )}
-                  <img
-                    src={
-                      product.image_url ||
-                      "https://placehold.co/300x256/e2e8f0/e2e8f0?text=No-Image"
-                    }
-                    alt={product.name}
-                    className="w-full h-64 object-cover"
-                  />
-                </div>
-              </CardBody>
-              <CardFooter className="flex flex-col items-start gap-3 p-4">
-                <h3 className="font-semibold text-md">{product.name}</h3>
-                <p className="text-xs text-default-500 line-clamp-2 h-8">
-                  {product.description}
-                </p>
+            <div key={cat.id} id={`category-${cat.id}`} className="scroll-mt-24">
+              {/* Judul Kategori sebagai pembatas */}
+              <h2 className="text-2xl font-bold mb-4 ml-2">{cat.name}</h2>
+              
+              {/* Grid Produk per Kategori */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {catProducts.map((product) => {
+                  const selectedSize = selectedSizes[product.id] || "regular";
+                  const basePrice =
+                    selectedSize === "large" && product.price_large
+                      ? product.price_large
+                      : product.price;
 
-                <RadioGroup
-                  orientation="horizontal"
-                  value={selectedSize}
-                  onValueChange={(val) =>
-                    setSelectedSizes((prev) => ({
-                      ...prev,
-                      [product.id]: val as "regular" | "large",
-                    }))
-                  }
-                >
-                  <Radio value="regular">Regular</Radio>
-                  <Radio value="large" isDisabled={!product.price_large}>
-                    Large
-                  </Radio>
-                </RadioGroup>
+                  const hasDiscount = product.discount !== null && product.discount > 0;
+                  const discountedPrice = hasDiscount
+                    ? Math.round(basePrice * (1 - product.discount! / 100))
+                    : basePrice;
 
-                <div className="flex items-center justify-between w-full mt-2">
-                  <div className="flex flex-col">
-                    {product.discount && (
-                      <span className="text-xs text-red-400 line-through">
-                        {new Intl.NumberFormat("id-ID", {
-                          style: "currency",
-                          currency: "IDR",
-                        }).format(basePrice)}
-                      </span>
-                    )}
-
-                    <span
-                      className={`font-bold ${
-                        product.discount ? "text-green-500 text-lg" : "text-default-800"
-                      }`}
+                  return (
+                    <Card
+                      key={product.id}
+                      className="border border-default-200 cursor-pointer"
+                      onPress={() => handleProductClick(product.id)}
                     >
-                      {new Intl.NumberFormat("id-ID", {
-                        style: "currency",
-                        currency: "IDR",
-                      }).format(product.discount ? discountedPrice : basePrice)}
-                    </span>
-                  </div>
+                      <CardBody className="p-0 overflow-hidden">
+                        <div className="relative">
+                          {hasDiscount && (
+                            <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow z-10">
+                              -{product.discount}%
+                            </span>
+                          )}
+                          <img
+                            src={
+                              product.image_url ||
+                              "https://placehold.co/300x256/e2e8f0/e2e8f0?text=No-Image"
+                            }
+                            alt={product.name}
+                            className="w-full h-64 object-cover"
+                          />
+                        </div>
+                      </CardBody>
+                      <CardFooter className="flex flex-col items-start gap-3 p-4">
+                        <h3 className="font-semibold text-md">{product.name}</h3>
+                        <p className="text-xs text-default-500 line-clamp-2 h-8">
+                          {product.description}
+                        </p>
 
-                  <Button
-                    size="sm"
-                    color="primary"
-                    variant="flat"
-                    endContent={<Icon icon="lucide:shopping-cart" />}
-                    onClick={(e) => handleAddToCart(e, product)}
-                  >
-                    Add
-                  </Button>
-                </div>
+                        <RadioGroup
+                          orientation="horizontal"
+                          value={selectedSize}
+                          onValueChange={(val) =>
+                            setSelectedSizes((prev) => ({
+                              ...prev,
+                              [product.id]: val as "regular" | "large",
+                            }))
+                          }
+                        >
+                          <Radio value="regular">Regular</Radio>
+                          <Radio value="large" isDisabled={!product.price_large}>
+                            Large
+                          </Radio>
+                        </RadioGroup>
 
-              </CardFooter>
-            </Card>
+                        <div className="flex items-center justify-between w-full mt-2">
+                          <div className="flex flex-col">
+                            {product.discount && (
+                              <span className="text-xs text-red-400 line-through">
+                                {new Intl.NumberFormat("id-ID", {
+                                  style: "currency",
+                                  currency: "IDR",
+                                }).format(basePrice)}
+                              </span>
+                            )}
+
+                            <span
+                              className={`font-bold ${
+                                product.discount ? "text-green-500 text-lg" : "text-default-800"
+                              }`}
+                            >
+                              {new Intl.NumberFormat("id-ID", {
+                                style: "currency",
+                                currency: "IDR",
+                              }).format(product.discount ? discountedPrice : basePrice)}
+                            </span>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            color="primary"
+                            variant="flat"
+                            endContent={<Icon icon="lucide:shopping-cart" />}
+                            onClick={(e) => handleAddToCart(e, product)}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </div>
