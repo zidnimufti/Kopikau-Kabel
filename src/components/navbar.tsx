@@ -30,7 +30,7 @@ export const Navbar = () => {
             href="/"
           >
             <GiCoffeeCup size={22}/>
-            <p className="font-bold text-inherit">Kopikau Kabel</p>
+            <p className="font-bold text-inherit">Kopi Kabel</p>
           </Link>
         </NavbarBrand>
         <div className="hidden lg:flex gap-4 justify-start ml-2">
