@@ -1,8 +1,8 @@
-// --- FILE: src/pages/barista/BaristaPage.tsx (HeroUI + Auth Guard) ---
+// --- FILE: src/pages/barista/BaristaPage.tsx (HeroUI + Auth Guard + Absensi) ---
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { Category, Product, CartItem, Order } from "../../types";
+import { Category, Product, CartItem, Order, PendingOrderWithItems } from "../../types";
 import {
   getActiveMenu,
   createOrder,
@@ -29,6 +29,10 @@ import {
   Spinner,
 } from "@heroui/react";
 import { Link as HeroLink } from "@heroui/link";
+// NOTE: nama file diperbaiki dari "attandance" -> "attendanceApi" agar konsisten
+// dengan penamaan file API lain (menuApi.ts, adminApi.ts, orderApi.ts).
+// Pastikan file ini ada di src/api/attendanceApi.ts
+import { clockOutToday, getTodayAttendance } from "../../api/attandance";
 
 type PaymentMethod = "cash" | "qris";
 
@@ -158,7 +162,7 @@ const OrderCart = ({
               {cart.map((item) => (
                 <li key={item.id} className="py-3">
                   <div className="flex justify-between items-center gap-3">
-                    <p className="font-medium break-words">{item.name}</p>
+                    <p className="font-medium break-words">{item.name} ({item.size === "large" ? "Large" : "Regular"})</p>
                     <p className="font-semibold">
                       {new Intl.NumberFormat("id-ID").format(
                         item.price * item.quantity
@@ -231,11 +235,6 @@ const OrderCart = ({
 };
 
 /* ========================= Pending orders list ========================= */
-type PendingOrderWithItems = Order & {
-  payment_method?: PaymentMethod;
-  items?: { product_id: number; quantity: number; product?: Product }[];
-};
-
 const PendingOrdersList = ({
   orders,
   onUpdateStatus,
@@ -263,10 +262,12 @@ const PendingOrdersList = ({
           <div className="text-sm text-default-700 space-y-1">
             {(order.items ?? []).map((it) => (
               <div
-                key={`${order.id}-${it.product_id}`}
+                key={`${order.id}-${it.product_id}-${it.size}`}
                 className="flex justify-between"
               >
-                <span className="truncate">{it.product?.name ?? "Item"}</span>
+                <span className="truncate">
+                  {(it.product?.name ?? "Item")} ({it.size})
+                </span>
                 <span className="ml-2 font-medium">×{it.quantity}</span>
               </div>
             ))}
@@ -276,7 +277,12 @@ const PendingOrdersList = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
-            <Button size="sm" color="primary" className="w-full" onPress={() => onEdit(order.id)}>
+            <Button
+              size="sm"
+              color="primary"
+              className="w-full"
+              onPress={() => onEdit(order.id)}
+            >
               Edit
             </Button>
             <Button
@@ -303,6 +309,7 @@ const PendingOrdersList = ({
   </div>
 );
 
+
 /* ============================== Main page ============================== */
 export default function BaristaPage() {
   const { user, loading, logout } = useAuth(); // <- pastikan context menyediakan `loading`
@@ -316,9 +323,12 @@ export default function BaristaPage() {
   const [customerName, setCustomerName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"" | PaymentMethod>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pendingOrders, setPendingOrders] = useState<PendingOrderWithItems[]>(
-    []
-  );
+  const [pendingOrders, setPendingOrders] = useState<PendingOrderWithItems[]>([]);
+
+  // ===== Absensi: status "sudah absen pulang hari ini?" =====
+  const [hasClockedOut, setHasClockedOut] = useState(false);
+  const [clockingOut, setClockingOut] = useState(false);
+  const [checkingAttendance, setCheckingAttendance] = useState(true);
 
   // Ringkasan hari ini utk barista login
   const [todaySummary, setTodaySummary] = useState({
@@ -340,7 +350,32 @@ export default function BaristaPage() {
 
   const fetchPending = useCallback(async () => {
     const data = await getPendingOrdersWithItems();
-    setPendingOrders(data ?? []);
+
+    const transformed: Order[] = (data ?? []).map(order => ({
+      ...order,
+      payment_method: order.payment_method ?? null,
+      items: order.items?.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        size: item.size ?? "regular",
+        subtotal: item.subtotal ?? ((item.product?.price ?? 0) * item.quantity),
+        product: item.product
+          ? {
+              id: item.product.id,
+              name: item.product.name,
+              description: item.product.description,
+              price: item.product.price,
+              price_large: item.product.price_large,
+              image_url: item.product.image_url,
+              category_id: item.product.category_id,
+              size: null, // optional if your Product type requires it
+              discount: item.product.discount ?? null,
+            }
+          : undefined,
+      })) ?? [],
+    }));
+
+    setPendingOrders(transformed);
   }, []);
 
   const fetchTodaySummary = useCallback(async () => {
@@ -377,6 +412,20 @@ export default function BaristaPage() {
     setTodaySummary({ total, count, cash, qris });
   }, [user?.id]);
 
+  // Cek status absen pulang hari ini setiap kali user berubah/login
+  const fetchAttendanceStatus = useCallback(async () => {
+    if (!user?.id) return;
+    setCheckingAttendance(true);
+    try {
+      const record = await getTodayAttendance(user.id);
+      setHasClockedOut(!!record?.clock_out);
+    } catch (err) {
+      console.error("Gagal memeriksa status absensi:", err);
+    } finally {
+      setCheckingAttendance(false);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     getActiveMenu().then(({ products, categories }) => {
       setProducts(products);
@@ -409,9 +458,31 @@ export default function BaristaPage() {
     };
   }, [fetchPending, fetchTodaySummary]);
 
+  useEffect(() => {
+    fetchAttendanceStatus();
+  }, [fetchAttendanceStatus]);
+
   const handleLogout = async () => {
     await logout();
     navigate("/login", { replace: true });
+  };
+
+  // ===== Absensi: aksi absen pulang =====
+  const handleClockOut = async () => {
+    if (!user?.id) return;
+    const confirmed = window.confirm("Yakin ingin absen pulang sekarang?");
+    if (!confirmed) return;
+
+    setClockingOut(true);
+    try {
+      await clockOutToday(user.id);
+      setHasClockedOut(true);
+      alert("Absen pulang berhasil dicatat. Terima kasih!");
+    } catch (err: any) {
+      alert("Gagal mencatat absen pulang: " + (err?.message ?? "Terjadi kesalahan."));
+    } finally {
+      setClockingOut(false);
+    }
   };
 
   const sendOrdersUpdated = useCallback(async (meta?: Record<string, unknown>) => {
@@ -479,7 +550,7 @@ export default function BaristaPage() {
         await updateOrderAndItems(editingOrderId, {
           customer_name: customerName,
           payment_method: paymentMethod,
-          items: cart.map((c) => ({ product_id: c.id, quantity: c.quantity })),
+          items: cart.map((c) => ({ product_id: c.id, quantity: c.quantity, size: c.size })),
         });
       } else {
         const total = cart.reduce(
@@ -511,6 +582,12 @@ export default function BaristaPage() {
     }
   };
 
+  const [selectedSizes, setSelectedSizes] = useState<Record<number, "regular" | "large">>({});
+
+  const handleSizeChange = (productId: number, size: "regular" | "large") => {
+    setSelectedSizes((prev) => ({ ...prev, [productId]: size }));
+  };
+
   const handleUpdateStatus = async (
     orderId: number,
     status: "completed" | "cancelled"
@@ -523,17 +600,6 @@ export default function BaristaPage() {
     } catch (error: any) {
       alert(`Gagal mengubah status order: ${error.message}`);
     }
-  };
-
-  const handleAddToCart = (product: Product) => {
-    <Button
-  className="mt-auto"
-  color="primary"
-  onPress={() => handleAddToCart(product)}  // ← pakai fungsi
->
-  Tambah
-</Button>
-
   };
 
   const handleUpdateQuantity = (productId: number, newQuantity: number) => {
@@ -587,6 +653,23 @@ export default function BaristaPage() {
           <Button color="warning" onPress={() => setIsQueueOpen(true)}>
             Queue ({pendingOrders.length})
           </Button>
+
+          {/* Tombol Absen Pulang: hanya tampil kalau belum absen pulang hari ini */}
+          {!checkingAttendance && !hasClockedOut && (
+            <Button
+              color="secondary"
+              isLoading={clockingOut}
+              onPress={handleClockOut}
+            >
+              Absen Pulang
+            </Button>
+          )}
+          {hasClockedOut && (
+            <Chip color="success" variant="flat">
+              Sudah absen pulang
+            </Chip>
+          )}
+
           <Button color="danger" onPress={handleLogout}>
             Logout
           </Button>
@@ -671,42 +754,93 @@ export default function BaristaPage() {
 
             {/* Produk */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {filteredProducts.map((product) => (
-                <Card key={product.id} shadow="sm" className="text-center">
-                  <CardBody className="flex flex-col">
-                    <img
-                      src={
-                        product.image_url ||
-                        "https://placehold.co/150x100/e2e8f0/e2e8f0?text=No-Image"
-                      }
-                      alt={product.name}
-                      className="w-full h-24 object-cover rounded-md mb-2"
-                    />
-                    <p className="font-bold text-sm truncate">{product.name}</p>
-                    <p className="text-xs text-default-500 mb-2">
-                      {new Intl.NumberFormat("id-ID").format(product.price)}
-                    </p>
-                    <Button
-                      className="mt-auto"
-                      color="primary"
-                      onPress={() => {
-                        setCart((prev) => {
-                          const ex = prev.find((i) => i.id === product.id);
-                          if (ex)
-                            return prev.map((i) =>
-                              i.id === product.id
-                                ? { ...i, quantity: i.quantity + 1 }
-                                : i
-                            );
-                          return [...prev, { ...product, quantity: 1 }];
-                        });
-                      }}
-                    >
-                      Tambah
-                    </Button>
-                  </CardBody>
-                </Card>
-              ))}
+              {filteredProducts.map((product) => {
+                const selectedSize = selectedSizes[product.id] || "regular";
+                const basePrice =
+                  selectedSize === "large" && product.price_large
+                    ? product.price_large
+                    : product.price;
+                const finalPrice = product.discount
+                  ? Math.round(basePrice - (basePrice * product.discount) / 100)
+                  : basePrice;
+
+                return (
+                  <Card key={product.id} shadow="sm" className="text-center">
+                    <CardBody className="flex flex-col">
+                      <img
+                        src={product.image_url || "https://placehold.co/150x100/e2e8f0/e2e8f0?text=No-Image"}
+                        alt={product.name}
+                        className="w-full h-24 object-cover rounded-md mb-2"
+                      />
+                      <p className="font-bold text-sm truncate">{product.name}</p>
+                      <p className="text-xs text-default-500 mb-2">
+                        {product.discount ? (
+                          <span className="text-red-500 font-semibold">
+                            {new Intl.NumberFormat("id-ID").format(finalPrice)}{" "}
+                            <span className="line-through text-gray-400 text-xs ml-1">
+                              {new Intl.NumberFormat("id-ID").format(basePrice)}
+                            </span>
+                          </span>
+                        ) : (
+                          new Intl.NumberFormat("id-ID").format(finalPrice)
+                        )}
+                      </p>
+
+                      {/* Size selection */}
+                      <div className="flex justify-center gap-2 mb-2">
+                        <label>
+                          <input
+                            type="radio"
+                            name={`size-${product.id}`}
+                            value="regular"
+                            checked={selectedSize === "regular"}
+                            onChange={() => handleSizeChange(product.id, "regular")}
+                          />
+                          Regular
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            name={`size-${product.id}`}
+                            value="large"
+                            checked={selectedSize === "large"}
+                            onChange={() => handleSizeChange(product.id, "large")}
+                          />
+                          Large
+                        </label>
+                      </div>
+
+                      <Button
+                        className="mt-auto"
+                        color="primary"
+                        onPress={() => {
+                          setCart((prev) => {
+                            const ex = prev.find((i) => i.id === product.id && i.size === selectedSize);
+                            if (ex) {
+                              return prev.map((i) =>
+                                i.id === product.id && i.size === selectedSize
+                                  ? { ...i, quantity: i.quantity + 1 }
+                                  : i
+                              );
+                            }
+                            return [
+                              ...prev,
+                              {
+                                ...product,
+                                quantity: 1,
+                                size: selectedSize,
+                                price: finalPrice,
+                              } as CartItem,
+                            ];
+                          });
+                        }}
+                      >
+                        Tambah
+                      </Button>
+                    </CardBody>
+                  </Card>
+                );
+              })}
             </div>
           </section>
 
@@ -812,6 +946,7 @@ export default function BaristaPage() {
                 Tutup
               </Button>
             </ModalHeader>
+
             <ModalBody>
               <PendingOrdersList
                 orders={pendingOrders}

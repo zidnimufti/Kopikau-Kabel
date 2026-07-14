@@ -18,6 +18,9 @@ import BaristaListPage from './pages/admin/BaristaListPage';
 import BaristaDetailPage from './pages/admin/BaristaDetailPage';
 import OrderHistoryPage from './pages/admin/OrderHistoryPage';
 import InventoryPage from './pages/admin/Inventory';
+import AttendanceGuard from './auth/components/AttendanceGuard';
+import VerifyAttendancePage from './pages/barista/VerifyAttendancePage';
+
 
 const PublicLayout = () => (
   <main>
@@ -42,9 +45,12 @@ export default function App() {
 
       {/* App terproteksi */}
       <Route path="/app" element={<ProtectedRoute />}>
-        <Route index element={<Navigate to="/app/barista" replace />} />
-        <Route path="barista" element={<BaristaPage />} />
+  <Route index element={<Navigate to="/app/barista" replace />} />
+  <Route path="verify-attendance" element={<VerifyAttendancePage />} />
 
+  <Route element={<AttendanceGuard />}>
+    <Route path="barista" element={<BaristaPage />} />
+  </Route>
         {/* Admin */}
         <Route
           path="admin"

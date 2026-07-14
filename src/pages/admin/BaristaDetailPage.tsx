@@ -1,8 +1,8 @@
-// BaristaDetailPage.tsx (versi HeroUI)
-
+// BaristaDetailPage.tsx (versi HeroUI + Kelola PIN & Riwayat Absensi)
 import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getBaristaDetails, getBaristaSalesDetails } from "../../api/adminApi";
+import { setBaristaPin, getAttendanceHistory } from "../../api/attandance";
 import { UserProfile } from "../../types";
 import * as XLSX from "xlsx";
 import {
@@ -17,6 +17,7 @@ import {
   TableColumn,
   TableHeader,
   TableRow,
+  Chip,
 } from "@heroui/react";
 
 // ---------- Types ----------
@@ -34,6 +35,14 @@ interface ExcelRow {
   "Total (Rp)": number;
 }
 
+interface AttendanceRow {
+  id: number;
+  attendance_date: string;
+  shift: string;
+  clock_in: string;
+  clock_out: string | null;
+}
+
 // ---------- Util helpers ----------
 const fmtIDR = (n: number) =>
   new Intl.NumberFormat("id-ID", {
@@ -47,19 +56,26 @@ const toInputDate = (d: Date) => {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 };
+
 // ISO untuk awal/akhir hari (pakai zona waktu lokal)
 const startOfDayISO = (dateStr: string) => {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d, 0, 0, 0, 0).toISOString();
 };
+
 const endOfDayISO = (dateStr: string) => {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
 };
 
+const fmtDate = (dateStr: string) =>
+  new Date(dateStr).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
 const BaristaDetailPage = () => {
   const { baristaId } = useParams<{ baristaId: string }>();
-
   const [barista, setBarista] = useState<Partial<UserProfile> | null>(null);
   const [salesData, setSalesData] = useState<SalesDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,21 +92,36 @@ const BaristaDetailPage = () => {
   const [endDate, setEndDate] = useState<string>(defaultEnd);
   const [fetching, setFetching] = useState(false);
 
+  // ===== State untuk PIN =====
+  const [pinInput, setPinInput] = useState("");
+  const [savingPin, setSavingPin] = useState(false);
+  const [pinMessage, setPinMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // ===== State untuk riwayat absensi =====
+  const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRow[]>([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(true);
+
   // ------ Load barista + first fetch ------
   useEffect(() => {
     if (!baristaId) return;
     setLoading(true);
-
     getBaristaDetails(baristaId).then((data) => {
       setBarista((data as Partial<UserProfile>) ?? null);
     });
 
-    // initial load 30 hari
+    // initial load 30 hari (laporan penjualan)
     const sISO = startOfDayISO(defaultStart);
     const eISO = endOfDayISO(defaultEnd);
     getBaristaSalesDetails(baristaId, sISO, eISO)
       .then((data) => setSalesData(data ?? []))
       .finally(() => setLoading(false));
+
+    // riwayat absensi
+    setLoadingAttendance(true);
+    getAttendanceHistory(baristaId)
+      .then((data) => setAttendanceHistory(data as AttendanceRow[]))
+      .catch((err) => console.error("Gagal ambil riwayat absensi:", err))
+      .finally(() => setLoadingAttendance(false));
   }, [baristaId]);
 
   const applyDateRange = async () => {
@@ -114,6 +145,7 @@ const BaristaDetailPage = () => {
     setStartDate(toInputDate(start));
     setEndDate(toInputDate(end));
   };
+
   const setThisMonth = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -160,7 +192,30 @@ const BaristaDetailPage = () => {
     const fileName = `Laporan_${(barista?.full_name || "Barista")
       .replace(/\s+/g, "_")
       .trim()}_${startDate}_sd_${endDate}.xlsx`;
+
     XLSX.writeFile(wb, fileName);
+  };
+
+  // ------ Simpan PIN ------
+  const handleSavePin = async () => {
+    if (!baristaId) return;
+    setPinMessage(null);
+
+    if (!/^\d{4,6}$/.test(pinInput)) {
+      setPinMessage({ type: "error", text: "PIN harus 4-6 digit angka." });
+      return;
+    }
+
+    setSavingPin(true);
+    try {
+      await setBaristaPin(baristaId, pinInput);
+      setPinMessage({ type: "success", text: "PIN berhasil disimpan." });
+      setPinInput("");
+    } catch (err: any) {
+      setPinMessage({ type: "error", text: err.message || "Gagal menyimpan PIN." });
+    } finally {
+      setSavingPin(false);
+    }
   };
 
   if (loading)
@@ -184,8 +239,97 @@ const BaristaDetailPage = () => {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">
-            Laporan Penjualan: {barista?.full_name}
+            Detail Barista: {barista?.full_name}
           </h1>
+          <p className="text-default-500">
+            Kelola PIN absensi, lihat riwayat absen, dan laporan penjualan.
+          </p>
+        </div>
+      </div>
+
+      {/* ===== Kelola PIN Absensi ===== */}
+      <Card>
+        <CardBody className="space-y-3">
+          <h2 className="text-lg font-semibold">Kelola PIN Absensi</h2>
+          <p className="text-sm text-default-500">
+            PIN ini dipakai barista untuk verifikasi absen masuk. Isi untuk mengatur PIN baru
+            (menimpa PIN lama jika sudah ada).
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              label="PIN baru (4-6 digit)"
+              placeholder="misal: 1234"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
+              className="sm:max-w-xs"
+            />
+            <Button
+              color="primary"
+              isLoading={savingPin}
+              isDisabled={!pinInput}
+              onPress={handleSavePin}
+            >
+              Simpan PIN
+            </Button>
+          </div>
+          {pinMessage && (
+            <p className={pinMessage.type === "success" ? "text-success text-sm" : "text-danger text-sm"}>
+              {pinMessage.text}
+            </p>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* ===== Riwayat Absensi ===== */}
+      <Card>
+        <CardBody className="space-y-3">
+          <h2 className="text-lg font-semibold">Riwayat Absensi</h2>
+          {loadingAttendance ? (
+            <div className="flex items-center gap-2 text-default-500">
+              <Spinner size="sm" /> Memuat riwayat absensi...
+            </div>
+          ) : attendanceHistory.length === 0 ? (
+            <div className="text-default-500 text-sm">Belum ada riwayat absensi.</div>
+          ) : (
+            <Table aria-label="Riwayat absensi barista" removeWrapper>
+              <TableHeader>
+                <TableColumn>Tanggal</TableColumn>
+                <TableColumn>Shift</TableColumn>
+                <TableColumn>Jam Masuk</TableColumn>
+                <TableColumn>Jam Pulang</TableColumn>
+              </TableHeader>
+              <TableBody items={attendanceHistory}>
+                {(row: AttendanceRow) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{fmtDate(row.attendance_date)}</TableCell>
+                    <TableCell>{row.shift}</TableCell>
+                    <TableCell>{fmtTime(row.clock_in)}</TableCell>
+                    <TableCell>
+                      {row.clock_out ? (
+                        fmtTime(row.clock_out)
+                      ) : (
+                        <Chip size="sm" variant="flat" color="warning">
+                          Belum pulang
+                        </Chip>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* ===== Laporan Penjualan (bagian lama, tidak berubah) ===== */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold">
+            Laporan Penjualan
+          </h2>
           <p className="text-default-500">
             Pilih rentang tanggal lalu ekspor ke Excel.
           </p>
@@ -217,7 +361,6 @@ const BaristaDetailPage = () => {
               min={startDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
-
             <div className="flex gap-2">
               <Button variant="flat" className="flex-1" onPress={() => setQuickRange(7)}>
                 7 hari
@@ -233,7 +376,6 @@ const BaristaDetailPage = () => {
                 Bulan ini
               </Button>
             </div>
-
             <div className="flex gap-2">
               <Button
                 variant="bordered"
@@ -313,7 +455,6 @@ const BaristaDetailPage = () => {
               )}
             </TableBody>
           </Table>
-
           {sortedData.length > 0 && (
             <div className="mt-4 flex justify-end text-sm">
               <div className="font-semibold">

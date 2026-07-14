@@ -52,6 +52,17 @@ export const updateProduct = async (id: number, productData: Partial<Omit<Produc
 };
 
 export const deleteProduct = async (id: number) => {
+  // 1. Hapus dulu semua order_items yang mereferensikan produk ini
+  const { error: orderItemsError } = await supabase
+    .from('order_items')
+    .delete()
+    .eq('product_id', id);
+
+  if (orderItemsError) {
+    throw new Error(`Gagal menghapus riwayat order terkait: ${orderItemsError.message}`);
+  }
+
+  // 2. Baru hapus produknya
   const { data, error } = await supabase.from('products').delete().eq('id', id);
   if (error) throw new Error(error.message);
   return data;

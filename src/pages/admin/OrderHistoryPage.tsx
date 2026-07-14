@@ -31,16 +31,21 @@ interface DetailedOrder {
   customer_name: string;
   total_amount: number;
   status: "pending" | "completed" | "cancelled";
-  barista_name: string;
+  barista_name: string | null; // 👈 allow null
   payment_method?: "cash" | "qris" | null;
-  items: { product_name: string; quantity: number; subtotal: number }[];
+  items: {
+    product_name: string;
+    quantity: number;
+    size: "regular" | "large";
+    subtotal: number;
+  }[];
 }
 type StatusFilter = "all" | "completed" | "pending" | "cancelled";
 
 interface ExcelItemRow {
   Tanggal: string;
   Pelanggan: string;
-  Barista: string;
+  Barista: string | null;
   Produk: string;
   Jumlah: number;
   "Harga/Item (Rp)": number;
@@ -99,7 +104,7 @@ export default function OrderHistoryPage() {
 
   // Flatten items (completed only)
   const completedRows = useMemo(() => {
-    const rows: { created_at: string; customer_name: string; barista_name: string; product_name: string; quantity: number; subtotal: number; payment_method?: "cash"|"qris"|null; }[] = [];
+    const rows: { created_at: string; customer_name: string; barista_name: string | null; product_name: string; quantity: number; subtotal: number; payment_method?: "cash"|"qris"|null; }[] = [];
     orders.forEach((o) => {
       const t = new Date(o.created_at).getTime();
       if (o.status !== "completed" || t < sMs || t > eMs) return;
@@ -151,12 +156,11 @@ export default function OrderHistoryPage() {
     }).sort((a,b)=>b.total-a.total);
   }, [completedRows]);
 
-  // Exporters
   const exportDetailItem = () => {
     if (completedRows.length === 0) return alert("Tidak ada transaksi COMPLETED pada rentang ini.");
     const rows: ExcelItemRow[] = completedRows.map((r) => ({
       Tanggal: new Date(r.created_at).toLocaleString("id-ID"),
-      Pelanggan: r.customer_name,
+      Pelanggan: r.customer_name ?? "—",
       Barista: r.barista_name,
       Produk: r.product_name,
       Jumlah: r.quantity,
@@ -164,7 +168,7 @@ export default function OrderHistoryPage() {
       "Subtotal (Rp)": r.subtotal,
       Metode: (r.payment_method || "").toUpperCase(),
     }));
-    rows.push({ Tanggal:"", Pelanggan:"TOTAL OMSET", Barista:"", Produk:"", Jumlah:0, "Harga/Item (Rp)":0, "Subtotal (Rp)": totalOmsetCompleted, Metode:"" });
+    rows.push({ Tanggal:"", Pelanggan:"TOTAL OMSET", Barista:"—", Produk:"", Jumlah:0, "Harga/Item (Rp)":0, "Subtotal (Rp)": totalOmsetCompleted, Metode:"" });
     const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Detail Item (Completed)");
     XLSX.writeFile(wb, `Detail_Item_Completed_${startDate}_sd_${endDate}.xlsx`);
@@ -207,11 +211,8 @@ export default function OrderHistoryPage() {
   if (loading) return (<div className="p-6 flex items-center gap-2"><Spinner size="sm" /> Memuat…</div>);
 
   return (
-    // NOTE: cegah “geser samping” kecil di mobile
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4 overflow-x-hidden">
       <h1 className="text-2xl md:text-3xl font-bold">Riwayat & Ringkasan Penjualan</h1>
-
-      {/* Filter panel */}
       <Card>
         <CardBody className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
@@ -317,14 +318,14 @@ export default function OrderHistoryPage() {
       {/* CONTENT */}
       {tab === "orders" && (
         <>
-          {/* MOBILE: Card list */}
+          {/* MOBILE */}
           <div className="md:hidden space-y-3">
             {filteredOrders.map((order) => (
               <Card key={order.order_id} shadow="sm" className="text-left">
                 <CardBody className="space-y-2">
                   <div className="text-xs text-default-500">{new Date(order.created_at).toLocaleString("id-ID")}</div>
                   <div className="font-semibold break-words">{order.customer_name}</div>
-                  <div className="text-sm text-default-600">Barista: {order.barista_name}</div>
+                  <div className="text-sm text-default-600">Barista: {order.barista_name ?? "—"}</div>
                   <div className="flex flex-wrap gap-2">
                     <Chip size="sm" variant="flat" color={order.status==="completed"?"success":order.status==="pending"?"warning":"danger"}>{order.status}</Chip>
                     <Chip size="sm" variant="flat" color={order.payment_method==="cash"?"secondary":order.payment_method==="qris"?"primary":"default"}>
@@ -341,40 +342,37 @@ export default function OrderHistoryPage() {
                 </CardBody>
               </Card>
             ))}
-            {filteredOrders.length === 0 && (
-              <Card><CardBody className="text-center text-default-500">Tidak ada order.</CardBody></Card>
-            )}
           </div>
 
-          {/* ≥ md: Table */}
+          {/* DESKTOP TABLE */}
           <Card className="hidden md:block">
             <CardBody className="overflow-x-auto">
               <Table aria-label="Tabel orders" removeWrapper>
                 <TableHeader>
                   <TableColumn>Tanggal</TableColumn>
                   <TableColumn>Pelanggan</TableColumn>
-                  <TableColumn className="hidden md:table-cell">Barista</TableColumn>
-                  <TableColumn className="hidden lg:table-cell">Metode</TableColumn>
+                  <TableColumn>Barista</TableColumn>
+                  <TableColumn>Metode</TableColumn>
                   <TableColumn>Total</TableColumn>
                   <TableColumn>Status</TableColumn>
-                  <TableColumn className="hidden md:table-cell">Aksi</TableColumn>
+                  <TableColumn>Aksi</TableColumn>
                 </TableHeader>
                 <TableBody emptyContent="Tidak ada order." items={filteredOrders}>
                   {(order: DetailedOrder) => (
                     <TableRow key={order.order_id}>
                       <TableCell>{new Date(order.created_at).toLocaleString("id-ID")}</TableCell>
-                      <TableCell className="break-words">{order.customer_name}</TableCell>
-                      <TableCell className="hidden md:table-cell">{order.barista_name}</TableCell>
-                      <TableCell className="hidden lg:table-cell">
+                      <TableCell>{order.customer_name}</TableCell>
+                      <TableCell>{order.barista_name ?? "—"}</TableCell>
+                      <TableCell>
                         <Chip size="sm" variant="flat" color={order.payment_method==="cash"?"secondary":order.payment_method==="qris"?"primary":"default"}>
-                          {(order.payment_method || "—")?.toString().toUpperCase()}
+                          {(order.payment_method || "—").toString().toUpperCase()}
                         </Chip>
                       </TableCell>
                       <TableCell>{fmtIDR(order.total_amount)}</TableCell>
                       <TableCell>
                         <Chip size="sm" variant="flat" color={order.status==="completed"?"success":order.status==="pending"?"warning":"danger"}>{order.status}</Chip>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell space-x-2">
+                      <TableCell>
                         <Button size="sm" variant="flat" onPress={() => setSelectedOrder(order)}>Lihat Detail</Button>
                         <Button size="sm" color="danger" variant="light" isLoading={deletingId===order.order_id} onPress={() => handleDelete(order.order_id)}>
                           {deletingId===order.order_id ? "Menghapus…" : "Hapus"}
@@ -388,91 +386,75 @@ export default function OrderHistoryPage() {
           </Card>
         </>
       )}
-
-      {/* Rekap Produk */}
+      
+      {/* REKAP PRODUK */}
       {tab === "produk" && (
         <Card>
           <CardBody className="overflow-x-auto">
-            <Table aria-label="Rekap Produk" removeWrapper>
+            <Table aria-label="Tabel Rekap Produk" removeWrapper>
               <TableHeader>
-                <TableColumn>Tanggal</TableColumn>
+                <TableColumn>Terakhir</TableColumn>
                 <TableColumn>Produk</TableColumn>
-                <TableColumn className="text-right">Jumlah</TableColumn>
-                <TableColumn className="text-right">Total</TableColumn>
+                <TableColumn>Jumlah</TableColumn>
+                <TableColumn>Total</TableColumn>
               </TableHeader>
-              <TableBody emptyContent="Tidak ada data." items={rekapProduk}>
-                {(r: GroupRow) => (
-                  <TableRow key={r.key}>
-                    <TableCell>{r.lastAt ? new Date(r.lastAt).toLocaleDateString("id-ID") : "-"}</TableCell>
-                    <TableCell>{r.key}</TableCell>
-                    <TableCell className="text-right">{r.qty}</TableCell>
-                    <TableCell className="text-right">{fmtIDR(r.total)}</TableCell>
+              <TableBody emptyContent="Tidak ada data rekap produk." items={rekapProduk}>
+                {(row) => (
+                  <TableRow key={row.key}>
+                    <TableCell>{row.lastAt ? new Date(row.lastAt).toLocaleDateString("id-ID") : "—"}</TableCell>
+                    <TableCell>{row.key}</TableCell>
+                    <TableCell>{row.qty}</TableCell>
+                    <TableCell>{fmtIDR(row.total)}</TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
-            {rekapProduk.length > 0 && (
-              <div className="mt-4 flex justify-end text-sm font-semibold">
-                <div className="space-x-8">
-                  <span>TOTAL Qty: {rekapProduk.reduce((s,r)=>s+r.qty,0).toLocaleString()}</span>
-                  <span>TOTAL: {fmtIDR(rekapProduk.reduce((s,r)=>s+r.total,0))}</span>
-                </div>
-              </div>
-            )}
           </CardBody>
         </Card>
       )}
-
-      {/* Rekap Barista */}
+      
+      {/* REKAP BARISTA */}
       {tab === "barista" && (
         <Card>
           <CardBody className="overflow-x-auto">
-            <Table aria-label="Rekap Barista" removeWrapper>
+            <Table aria-label="Tabel Rekap Barista" removeWrapper>
               <TableHeader>
                 <TableColumn>Barista</TableColumn>
-                <TableColumn className="text-right">Jumlah Item</TableColumn>
-                <TableColumn className="text-right">Total</TableColumn>
+                <TableColumn>Jumlah Item</TableColumn>
+                <TableColumn>Total</TableColumn>
               </TableHeader>
-              <TableBody emptyContent="Tidak ada data." items={rekapBarista}>
-                {(r: GroupRow) => (
-                  <TableRow key={r.key}>
-                    <TableCell>{r.key}</TableCell>
-                    <TableCell className="text-right">{r.qty}</TableCell>
-                    <TableCell className="text-right">{fmtIDR(r.total)}</TableCell>
+              <TableBody emptyContent="Tidak ada data rekap barista." items={rekapBarista}>
+                {(row) => (
+                  <TableRow key={row.key}>
+                    <TableCell>{row.key}</TableCell>
+                    <TableCell>{row.qty}</TableCell>
+                    <TableCell>{fmtIDR(row.total)}</TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
-            {rekapBarista.length > 0 && (
-              <div className="mt-4 flex justify-end text-sm font-semibold">
-                <div className="space-x-8">
-                  <span>TOTAL Qty: {rekapBarista.reduce((s,r)=>s+r.qty,0).toLocaleString()}</span>
-                  <span>TOTAL: {fmtIDR(rekapBarista.reduce((s,r)=>s+r.total,0))}</span>
-                </div>
-              </div>
-            )}
           </CardBody>
         </Card>
       )}
-
-      {/* Barista × Produk */}
+      
+      {/* BARISTA x PRODUK */}
       {tab === "baristaProduk" && (
         <Card>
           <CardBody className="overflow-x-auto">
-            <Table aria-label="Barista × Produk" removeWrapper>
+            <Table aria-label="Tabel Barista × Produk" removeWrapper>
               <TableHeader>
                 <TableColumn>Barista</TableColumn>
                 <TableColumn>Produk</TableColumn>
-                <TableColumn className="text-right">Jumlah</TableColumn>
-                <TableColumn className="text-right">Total</TableColumn>
+                <TableColumn>Jumlah</TableColumn>
+                <TableColumn>Total</TableColumn>
               </TableHeader>
-              <TableBody emptyContent="Tidak ada data." items={rekapBaristaProduk}>
-                {(r: GroupBPRow) => (
-                  <TableRow key={`${r.barista}-${r.product}-${r.qty}-${r.total}`}>
-                    <TableCell>{r.barista}</TableCell>
-                    <TableCell>{r.product}</TableCell>
-                    <TableCell className="text-right">{r.qty}</TableCell>
-                    <TableCell className="text-right">{fmtIDR(r.total)}</TableCell>
+              <TableBody emptyContent="Tidak ada data barista × produk." items={rekapBaristaProduk}>
+                {(row) => (
+                  <TableRow key={`${row.barista}-${row.product}`}>
+                    <TableCell>{row.barista}</TableCell>
+                    <TableCell>{row.product}</TableCell>
+                    <TableCell>{row.qty}</TableCell>
+                    <TableCell>{fmtIDR(row.total)}</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -491,7 +473,10 @@ export default function OrderHistoryPage() {
                 <div className="divide-y divide-default-200">
                   {selectedOrder.items.map((item,i)=>(
                     <div key={i} className="py-2 flex justify-between text-sm">
-                      <span>{item.quantity}× {item.product_name}</span>
+                      <span>
+                        {item.quantity}× {item.product_name}
+                        {item.size ? ` (${item.size})` : ""}
+                      </span>
                       <span>{fmtIDR(item.subtotal)}</span>
                     </div>
                   ))}
