@@ -235,14 +235,6 @@ const OrderCart = ({
 };
 
 /* ========================= Pending orders list ========================= */
-<<<<<<< HEAD
-=======
-/*type PendingOrderWithItems = Order & {
-  payment_method?: PaymentMethod;
-  items?: { product_id: number; quantity: number; product?: Product }[];
-};
-*/
->>>>>>> 69a04b38a0fe88b2e23f55fee5819e890a86a17e
 const PendingOrdersList = ({
   orders,
   onUpdateStatus,
@@ -333,13 +325,10 @@ export default function BaristaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingOrders, setPendingOrders] = useState<PendingOrderWithItems[]>([]);
 
-<<<<<<< HEAD
   // ===== Absensi: status "sudah absen pulang hari ini?" =====
   const [hasClockedOut, setHasClockedOut] = useState(false);
   const [clockingOut, setClockingOut] = useState(false);
   const [checkingAttendance, setCheckingAttendance] = useState(true);
-=======
->>>>>>> 69a04b38a0fe88b2e23f55fee5819e890a86a17e
 
   // Ringkasan hari ini utk barista login
   const [todaySummary, setTodaySummary] = useState({
@@ -360,7 +349,6 @@ export default function BaristaPage() {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchPending = useCallback(async () => {
-<<<<<<< HEAD
     const data = await getPendingOrdersWithItems();
 
     const transformed: Order[] = (data ?? []).map(order => ({
@@ -389,41 +377,6 @@ export default function BaristaPage() {
 
     setPendingOrders(transformed);
   }, []);
-=======
-  const data = await getPendingOrdersWithItems();
-
-const transformed: Order[] = (data ?? []).map(order => ({
-  ...order,
-  payment_method: order.payment_method ?? null,
-  items: order.items?.map(item => ({
-    product_id: item.product_id,
-    quantity: item.quantity,
-    size: item.size ?? "regular",
-    subtotal: item.subtotal ?? ((item.product?.price ?? 0) * item.quantity),
-    product: item.product
-      ? {
-          id: item.product.id,
-          name: item.product.name,
-          description: item.product.description,
-          price: item.product.price,
-          price_large: item.product.price_large,
-          image_url: item.product.image_url,
-          category_id: item.product.category_id,
-          size: null, // optional if your Product type requires it
-          discount: item.product.discount ?? null,
-        }
-      : undefined,
-  })) ?? [],
-}));
-
-setPendingOrders(transformed);
-
-setPendingOrders(transformed);
-
-}, []);
-
-
->>>>>>> 69a04b38a0fe88b2e23f55fee5819e890a86a17e
 
   const fetchTodaySummary = useCallback(async () => {
     if (!user?.id) return;
@@ -631,17 +584,9 @@ setPendingOrders(transformed);
 
   const [selectedSizes, setSelectedSizes] = useState<Record<number, "regular" | "large">>({});
 
-<<<<<<< HEAD
   const handleSizeChange = (productId: number, size: "regular" | "large") => {
     setSelectedSizes((prev) => ({ ...prev, [productId]: size }));
   };
-=======
-// handle size change
-const handleSizeChange = (productId: number, size: "regular" | "large") => {
-  setSelectedSizes((prev) => ({ ...prev, [productId]: size }));
-};
-
->>>>>>> 69a04b38a0fe88b2e23f55fee5819e890a86a17e
 
   const handleUpdateStatus = async (
     orderId: number,
@@ -672,7 +617,6 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
   const filteredProducts = products.filter((p) => p.category_id === activeCategory);
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
   const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  
 
   /* ------------------------ AUTH GUARD DI HALAMAN ------------------------ */
   if (loading) {
@@ -871,10 +815,6 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
                         color="primary"
                         onPress={() => {
                           setCart((prev) => {
-<<<<<<< HEAD
-=======
-
->>>>>>> 69a04b38a0fe88b2e23f55fee5819e890a86a17e
                             const ex = prev.find((i) => i.id === product.id && i.size === selectedSize);
                             if (ex) {
                               return prev.map((i) =>
@@ -889,11 +829,7 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
                                 ...product,
                                 quantity: 1,
                                 size: selectedSize,
-<<<<<<< HEAD
                                 price: finalPrice,
-=======
-                                price: finalPrice, // ✅ overwrite price here
->>>>>>> 69a04b38a0fe88b2e23f55fee5819e890a86a17e
                               } as CartItem,
                             ];
                           });
@@ -901,19 +837,10 @@ const handleSizeChange = (productId: number, size: "regular" | "large") => {
                       >
                         Tambah
                       </Button>
-<<<<<<< HEAD
-=======
-
->>>>>>> 69a04b38a0fe88b2e23f55fee5819e890a86a17e
                     </CardBody>
                   </Card>
                 );
               })}
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 69a04b38a0fe88b2e23f55fee5819e890a86a17e
             </div>
           </section>
 
