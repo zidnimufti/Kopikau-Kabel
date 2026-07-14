@@ -22,6 +22,7 @@ import AttendanceGuard from './auth/components/AttendanceGuard';
 import VerifyAttendancePage from './pages/barista/VerifyAttendancePage';
 
 
+
 const PublicLayout = () => (
   <main>
     <Outlet />
