@@ -80,12 +80,22 @@ export const setBaristaPin = async (baristaId: string, pin: string) => {
   if (!/^\d{4,6}$/.test(pin)) {
     throw new Error('PIN harus berupa 4-6 digit angka.');
   }
-  const { error } = await supabase
+
+  const { data, error } = await supabase
     .from('users')
     .update({ pin_code: pin })
-    .eq('id', baristaId);
+    .eq('id', baristaId)
+    .select(); // <-- tambahkan ini
 
   if (error) throw new Error(error.message);
+
+  // Kalau data kosong, berarti 0 baris ter-update (kemungkinan besar diblokir RLS)
+  if (!data || data.length === 0) {
+    throw new Error(
+      'PIN tidak tersimpan. Kemungkinan besar diblokir oleh RLS policy — cek policy UPDATE pada tabel users.'
+    );
+  }
+
   return true;
 };
 
