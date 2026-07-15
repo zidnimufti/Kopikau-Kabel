@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Card, CardBody, CardFooter, Button, Radio, RadioGroup, Chip } from "@heroui/react";
-import { Product, Category } from "../types"; 
+import { Product, Category } from "../types";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../components/CartContext"; 
+import { useCart } from "../components/CartContext";
 import { Icon } from "@iconify/react";
 import { supabase } from "../api/supabaseClient";
 
@@ -13,10 +13,18 @@ interface ProductGridProps {
 export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
   const history = useNavigate();
   const { addToCart } = useCart();
-
   const [selectedSizes, setSelectedSizes] = useState<{ [productId: number]: "regular" | "large" }>({});
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+
+  // ===== State untuk popup notifikasi "berhasil ditambahkan ke keranjang" =====
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => setToastMessage(null), 2000);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
 
   // Ambil data kategori dari Supabase
   useEffect(() => {
@@ -50,7 +58,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
     // Setting area deteksi (sedikit di atas layar agar transisi lebih natural)
     const observer = new IntersectionObserver(handleIntersect, {
       root: null,
-      rootMargin: "-20% 0px -70% 0px", 
+      rootMargin: "-20% 0px -70% 0px",
     });
 
     // Observasi setiap elemen kategori
@@ -70,6 +78,9 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
     e.stopPropagation();
     const selectedSize = selectedSizes[product.id] || "regular";
     addToCart(product, selectedSize);
+
+    // Tampilkan popup notifikasi
+    setToastMessage(`${product.name} ditambahkan ke keranjang`);
   };
 
   // Fungsi untuk scroll otomatis saat Chip diklik
@@ -85,10 +96,9 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
 
   return (
     <div className="flex flex-col gap-6">
-      
-      {/* Tombol kategori (Sticky) 
-        Tambahkan background color (misal bg-white) sesuai tema Anda agar produk yang discroll lewat bawahnya tertutup dengan rapi.
-        Di sini saya pakai backdrop-blur agar terlihat modern.
+      {/* Tombol kategori (Sticky)
+          Tambahkan background color (misal bg-white) sesuai tema Anda agar produk yang discroll lewat bawahnya tertutup dengan rapi.
+          Di sini saya pakai backdrop-blur agar terlihat modern.
       */}
       <div className="sticky top-[60px] z-40 bg-background/80 backdrop-blur-md py-4 mt-4 flex justify-center gap-3 flex-wrap">
         {categories.map((cat) => (
@@ -117,7 +127,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
             <div key={cat.id} id={`category-${cat.id}`} className="scroll-mt-24">
               {/* Judul Kategori sebagai pembatas */}
               <h2 className="text-2xl font-bold mb-4 ml-2">{cat.name}</h2>
-              
+
               {/* Grid Produk per Kategori */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {catProducts.map((product) => {
@@ -126,7 +136,6 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
                     selectedSize === "large" && product.price_large
                       ? product.price_large
                       : product.price;
-
                   const hasDiscount = product.discount !== null && product.discount > 0;
                   const discountedPrice = hasDiscount
                     ? Math.round(basePrice * (1 - product.discount! / 100))
@@ -187,7 +196,6 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
                                 }).format(basePrice)}
                               </span>
                             )}
-
                             <span
                               className={`font-bold ${
                                 product.discount ? "text-green-500 text-lg" : "text-default-800"
@@ -219,6 +227,19 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
           );
         })}
       </div>
+
+      {/* ===== Popup Notifikasi "Berhasil ditambahkan ke keranjang" ===== */}
+      {toastMessage && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background
+                     px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4"
+          role="status"
+          aria-live="polite"
+        >
+          <Icon icon="lucide:check-circle" className="text-lg" />
+          <span className="text-sm font-medium">{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 };

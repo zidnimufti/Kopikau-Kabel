@@ -1,7 +1,6 @@
 // --- FILE: src/components/CartDropdown.tsx ---
 // Deskripsi: Dropdown keranjang dengan pembayaran Cash / QRIS
 // - Menampilkan size (regular/large) dan menggunakan harga langsung dari DB
-
 import React, { useState, useEffect } from "react";
 import {
   Dropdown,
@@ -35,7 +34,6 @@ function getUnitPriceFromDB(product: Product, size: "regular" | "large") {
   if (product.discount && product.discount > 0) {
     return Math.round(basePrice * (1 - product.discount / 100));
   }
-
   return basePrice;
 }
 
@@ -97,6 +95,17 @@ export const CartDropdown: React.FC = () => {
     onOpenFirstModal();
   };
 
+  // ===== Download QR sebagai gambar =====
+  const handleDownloadQris = () => {
+    if (!qrisDataUri) return;
+    const link = document.createElement("a");
+    link.href = qrisDataUri;
+    link.download = `QRIS-KopiKabel-Rp${cartTotal}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Modal 2 (Konfirmasi & kirim WA)
   const {
     isOpen: isOpenSecondModal,
@@ -138,7 +147,6 @@ export const CartDropdown: React.FC = () => {
             )}
           </Button>
         </DropdownTrigger>
-
         <DropdownMenu
           aria-label="Cart Items"
           className="w-80"
@@ -353,9 +361,28 @@ export const CartDropdown: React.FC = () => {
                         />
                       )}
                     </div>
-                    <p className="text-center text-default-500">
+                    <p className="text-center text-default-500 mb-3">
                       Scan kode di atas untuk membayar Rp
                       {cartTotal.toLocaleString("id-ID")}
+                    </p>
+
+                    {/* Tombol Download QR */}
+                    {!loadingQris && qrisDataUri && (
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        color="default"
+                        startContent={<Icon icon="lucide:download" />}
+                        onPress={handleDownloadQris}
+                      >
+                        Download QR
+                      </Button>
+                    )}
+                    <p className="text-center text-xs text-default-400 mt-2">
+                      Simpan gambar ini lalu buka sendiri aplikasi
+                      Bank/e-wallet Anda untuk scan dari galeri.
+                      Setelah melakukan pembayaran, Harap kembali ke web untuk 
+                      konfirmasi dan melanjutkan pesanan
                     </p>
                   </div>
                 ) : (
@@ -406,7 +433,6 @@ export const CartDropdown: React.FC = () => {
                   />
                 )}
               </ModalBody>
-
               <ModalFooter className="gap-2">
                 <Button
                   color="danger"
@@ -415,7 +441,6 @@ export const CartDropdown: React.FC = () => {
                 >
                   Cancel
                 </Button>
-
                 <Button
                   color="primary"
                   isDisabled={
@@ -434,7 +459,6 @@ export const CartDropdown: React.FC = () => {
                         item.quantity
                       } = Rp.${(unit * item.quantity).toFixed(0)}`;
                     });
-
                     const totalLine = `Total: Rp.${cartTotal.toFixed(0)}`;
 
                     if (paymentMethod === "qris") {

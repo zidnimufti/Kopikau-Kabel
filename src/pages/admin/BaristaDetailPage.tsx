@@ -74,6 +74,17 @@ const fmtDate = (dateStr: string) =>
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
+// Hitung selisih menit antara jam masuk & pulang
+const diffMinutes = (clockIn: string, clockOut: string) =>
+  Math.max(0, Math.round((new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 60000));
+
+// Format total menit jadi "3j 15m"
+const fmtDuration = (totalMinutes: number) => {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}j ${m}m`;
+};
+
 const BaristaDetailPage = () => {
   const { baristaId } = useParams<{ baristaId: string }>();
   const [barista, setBarista] = useState<Partial<UserProfile> | null>(null);
@@ -169,6 +180,16 @@ const BaristaDetailPage = () => {
     [sortedData]
   );
 
+  // Total jam kerja dari semua absensi yang sudah ada jam pulangnya
+  const totalWorkMinutes = useMemo(
+    () =>
+      attendanceHistory.reduce(
+        (sum, row) => sum + (row.clock_out ? diffMinutes(row.clock_in, row.clock_out) : 0),
+        0
+      ),
+    [attendanceHistory]
+  );
+
   // ------ Export Excel (mengikuti filter + urutan) ------
   const handleExport = () => {
     const dataToExport: ExcelRow[] = sortedData.map((item) => ({
@@ -192,6 +213,37 @@ const BaristaDetailPage = () => {
     const fileName = `Laporan_${(barista?.full_name || "Barista")
       .replace(/\s+/g, "_")
       .trim()}_${startDate}_sd_${endDate}.xlsx`;
+
+    XLSX.writeFile(wb, fileName);
+  };
+
+  // ------ Export Excel: Riwayat Absensi ------
+  const handleExportAttendance = () => {
+    const rows = attendanceHistory.map((row) => ({
+      Tanggal: fmtDate(row.attendance_date),
+      Shift: row.shift,
+      "Jam Masuk": fmtTime(row.clock_in),
+      "Jam Pulang": row.clock_out ? fmtTime(row.clock_out) : "Belum pulang",
+      "Durasi Kerja": row.clock_out
+        ? fmtDuration(diffMinutes(row.clock_in, row.clock_out))
+        : "-",
+    }));
+
+    rows.push({
+      Tanggal: "",
+      Shift: "",
+      "Jam Masuk": "",
+      "Jam Pulang": "TOTAL JAM KERJA",
+      "Durasi Kerja": fmtDuration(totalWorkMinutes),
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Riwayat Absensi");
+
+    const fileName = `Absensi_${(barista?.full_name || "Barista")
+      .replace(/\s+/g, "_")
+      .trim()}.xlsx`;
 
     XLSX.writeFile(wb, fileName);
   };
@@ -286,7 +338,15 @@ const BaristaDetailPage = () => {
       {/* ===== Riwayat Absensi ===== */}
       <Card>
         <CardBody className="space-y-3">
-          <h2 className="text-lg font-semibold">Riwayat Absensi</h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold">Riwayat Absensi</h2>
+            {attendanceHistory.length > 0 && (
+              <Button size="sm" color="success" onPress={handleExportAttendance}>
+                Ekspor ke Excel
+              </Button>
+            )}
+          </div>
+
           {loadingAttendance ? (
             <div className="flex items-center gap-2 text-default-500">
               <Spinner size="sm" /> Memuat riwayat absensi...
@@ -294,32 +354,47 @@ const BaristaDetailPage = () => {
           ) : attendanceHistory.length === 0 ? (
             <div className="text-default-500 text-sm">Belum ada riwayat absensi.</div>
           ) : (
-            <Table aria-label="Riwayat absensi barista" removeWrapper>
-              <TableHeader>
-                <TableColumn>Tanggal</TableColumn>
-                <TableColumn>Shift</TableColumn>
-                <TableColumn>Jam Masuk</TableColumn>
-                <TableColumn>Jam Pulang</TableColumn>
-              </TableHeader>
-              <TableBody items={attendanceHistory}>
-                {(row: AttendanceRow) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{fmtDate(row.attendance_date)}</TableCell>
-                    <TableCell>{row.shift}</TableCell>
-                    <TableCell>{fmtTime(row.clock_in)}</TableCell>
-                    <TableCell>
-                      {row.clock_out ? (
-                        fmtTime(row.clock_out)
-                      ) : (
-                        <Chip size="sm" variant="flat" color="warning">
-                          Belum pulang
-                        </Chip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+            <>
+              <div className="text-sm text-default-700">
+                Total Jam Kerja (seluruh riwayat):{" "}
+                <span className="font-semibold">{fmtDuration(totalWorkMinutes)}</span>
+              </div>
+
+              <Table aria-label="Riwayat absensi barista" removeWrapper>
+                <TableHeader>
+                  <TableColumn>Tanggal</TableColumn>
+                  <TableColumn>Shift</TableColumn>
+                  <TableColumn>Jam Masuk</TableColumn>
+                  <TableColumn>Jam Pulang</TableColumn>
+                  <TableColumn>Durasi Kerja</TableColumn>
+                </TableHeader>
+                <TableBody items={attendanceHistory}>
+                  {(row: AttendanceRow) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{fmtDate(row.attendance_date)}</TableCell>
+                      <TableCell>{row.shift}</TableCell>
+                      <TableCell>{fmtTime(row.clock_in)}</TableCell>
+                      <TableCell>
+                        {row.clock_out ? (
+                          fmtTime(row.clock_out)
+                        ) : (
+                          <Chip size="sm" variant="flat" color="warning">
+                            Belum pulang
+                          </Chip>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.clock_out ? (
+                          fmtDuration(diffMinutes(row.clock_in, row.clock_out))
+                        ) : (
+                          <span className="text-default-400">-</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </>
           )}
         </CardBody>
       </Card>
