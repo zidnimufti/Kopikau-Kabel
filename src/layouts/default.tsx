@@ -17,10 +17,10 @@ export default function DefaultLayout({
         <Link
           isExternal
           className="flex items-center gap-1 text-current"
-          href="https://www.instagram.com/zidni_mufti/"
+          href="https://www.instagram.com/kopi.kabel/"
         >
           <span className="text-default-600">Powered by</span>
-          <p className="text-primary">Orang Ganteng</p>
+          <p className="text-primary">Zidni Mufti</p>
         </Link>
       </footer>
     </div>

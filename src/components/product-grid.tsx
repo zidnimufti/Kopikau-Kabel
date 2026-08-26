@@ -129,7 +129,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
               <h2 className="text-2xl font-bold mb-4 ml-2">{cat.name}</h2>
 
               {/* Grid Produk per Kategori */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
                 {catProducts.map((product) => {
                   const selectedSize = selectedSizes[product.id] || "regular";
                   const basePrice =
@@ -160,11 +160,11 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
                               "https://placehold.co/300x256/e2e8f0/e2e8f0?text=No-Image"
                             }
                             alt={product.name}
-                            className="w-full h-64 object-cover"
+                            className="w-full h-40 sm:h-64 object-cover"
                           />
                         </div>
                       </CardBody>
-                      <CardFooter className="flex flex-col items-start gap-3 p-4">
+                      <CardFooter className="flex flex-col items-start gap-2 p-3 sm:p-4">
                         <h3 className="font-semibold text-md">{product.name}</h3>
                         <p className="text-xs text-default-500 line-clamp-2 h-8">
                           {product.description}
@@ -173,6 +173,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
                         <RadioGroup
                           orientation="horizontal"
                           value={selectedSize}
+                          size="sm"
                           onValueChange={(val) =>
                             setSelectedSizes((prev) => ({
                               ...prev,
@@ -212,6 +213,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
                             size="sm"
                             color="primary"
                             variant="flat"
+                            className="h-7 px-2 min-w-0 text-[10px] sm:h-8 sm:px-3 sm:text-xs"
                             endContent={<Icon icon="lucide:shopping-cart" />}
                             onClick={(e) => handleAddToCart(e, product)}
                           >
