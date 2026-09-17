@@ -20,7 +20,7 @@ import OrderHistoryPage from './pages/admin/OrderHistoryPage';
 import InventoryPage from './pages/admin/Inventory';
 import AttendanceGuard from './auth/components/AttendanceGuard';
 import VerifyAttendancePage from './pages/barista/VerifyAttendancePage';
-import FinanceRecapPage from './pages/admin/FInanceRecap';
+import FinanceRecapPage from './pages/admin/FinanceRecap';
 
 
 
