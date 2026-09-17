@@ -20,6 +20,7 @@ import OrderHistoryPage from './pages/admin/OrderHistoryPage';
 import InventoryPage from './pages/admin/Inventory';
 import AttendanceGuard from './auth/components/AttendanceGuard';
 import VerifyAttendancePage from './pages/barista/VerifyAttendancePage';
+import FinanceRecapPage from './pages/admin/FInanceRecap';
 
 
 
@@ -61,6 +62,9 @@ export default function App() {
             </RoleGuard>
           }
         >
+          <Route path="orders" element={<OrderHistoryPage />} />
+          <Route path="finance" element={<FinanceRecapPage />} />   {/* ← baru */}
+          <Route path="stock" element={<InventoryPage />} />
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="menu" element={<MenuManagementPage />} />

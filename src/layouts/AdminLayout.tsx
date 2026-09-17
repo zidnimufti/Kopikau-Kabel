@@ -25,6 +25,7 @@ const NAVS: NavDef[] = [
   { to: "/app/admin/menu", label: "Menu" },
   { to: "/app/admin/baristas", label: "Kelola Barista" },
   { to: "/app/admin/orders", label: "Riwayat Order" },
+  { to: "/app/admin/finance", label: "Rekap Keuangan" }, 
   { to: "/app/admin/stock", label: "Stok Bahan" },
 ];
 
