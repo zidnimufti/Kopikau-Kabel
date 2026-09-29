@@ -79,7 +79,7 @@ export default function AdminLayout() {
           className="text-2xl font-bold"
           onPress={() => setIsSidebarOpen(false)}
         >
-          KopiKau Admin
+          KopiKabel Admin
         </UiLink>
         <p className="text-sm text-default-500">
           Welcome, {profile?.full_name || "Admin"}

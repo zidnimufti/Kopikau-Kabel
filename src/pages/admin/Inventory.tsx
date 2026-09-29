@@ -6,7 +6,8 @@ import * as XLSX from "xlsx"; // NEW: untuk ekspor Excel
 // Komponen UI (pakai apa yang sudah kamu gunakan di project)
 import {
   Button, Input, Card, CardBody, Table, TableHeader, TableColumn,
-  TableBody, TableRow, TableCell
+  TableBody, TableRow, TableCell, Modal, ModalContent, ModalHeader,
+  ModalBody, ModalFooter,
 } from "@heroui/react";
 
 type Item = { id: string; name: string; unit: string; min_stock: number | null };
@@ -22,6 +23,79 @@ type Movement = {
   items?: Item;
 };
 
+// ---- Pilihan satuan baku, supaya tidak lagi muncul "kg" vs "Kg" vs "KG" ----
+const UNIT_PRESETS = ["Kg", "Gram", "Liter", "Ml", "Pcs"] as const;
+const CUSTOM_UNIT = "Lainnya";
+
+/** Dropdown satuan + input manual kalau pilih "Lainnya". */
+function UnitPicker({
+  value,
+  onChange,
+  label = "Unit",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label?: string;
+}) {
+  const isPreset = (UNIT_PRESETS as readonly string[]).includes(value);
+  const [customMode, setCustomMode] = useState(!isPreset && value !== "");
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="text-sm font-medium">{label}</label>
+        <select
+          className="w-full border rounded-md p-2"
+          value={customMode ? CUSTOM_UNIT : value || UNIT_PRESETS[0]}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === CUSTOM_UNIT) {
+              setCustomMode(true);
+              onChange("");
+            } else {
+              setCustomMode(false);
+              onChange(v);
+            }
+          }}
+        >
+          {UNIT_PRESETS.map((u) => (
+            <option key={u} value={u}>{u}</option>
+          ))}
+          <option value={CUSTOM_UNIT}>{CUSTOM_UNIT} (isi manual)</option>
+        </select>
+      </div>
+      {customMode && (
+        <Input
+          label="Satuan kustom"
+          placeholder="contoh: sachet, botol"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** "1,5" atau "1.5" atau "0,5" -> 1.5 / 0.5. Kosong atau tidak valid -> NaN. */
+function parseDecimalComma(input: string): number {
+  const normalized = input.trim().replace(",", ".");
+  if (normalized === "" || normalized === "." ) return NaN;
+  return Number(normalized);
+}
+
+/** Batasi ketikan hanya angka + maksimal satu koma (atau titik), biar tidak
+ *  bisa ketik dua koma atau huruf. "0" di awal dibiarkan apa adanya. */
+function sanitizeDecimalInput(raw: string): string {
+  // ganti titik jadi koma dulu biar konsisten, lalu buang karakter selain angka/koma
+  let v = raw.replace(".", ",").replace(/[^0-9,]/g, "");
+  const firstComma = v.indexOf(",");
+  if (firstComma !== -1) {
+    // hanya izinkan satu koma; buang koma berikutnya
+    v = v.slice(0, firstComma + 1) + v.slice(firstComma + 1).replace(/,/g, "");
+  }
+  return v;
+}
+
 export default function InventoryPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [stock, setStock] = useState<StockRow[]>([]);
@@ -30,19 +104,27 @@ export default function InventoryPage() {
 
   // Form pergerakan
   const [selectedItemId, setSelectedItemId] = useState<string>("");
-  const [qty, setQty] = useState<number>(0);
+  // NEW: qty disimpan sebagai teks mentah (bukan number) supaya "0" di awal
+  // tidak hilang dan koma desimal ("1,5") bisa diketik apa adanya.
+  const [qtyInput, setQtyInput] = useState<string>("");
   const [direction, setDirection] = useState<"in" | "out">("in");
   const [reason, setReason] = useState<"Ke kedai" | "Keperluan pribadi" | "">("");
   const [note, setNote] = useState<string>("");
 
   // Tambah item cepat
   const [newItemName, setNewItemName] = useState("");
-  const [newItemUnit, setNewItemUnit] = useState("pcs");
+  const [newItemUnit, setNewItemUnit] = useState<string>(UNIT_PRESETS[0]);
+
+  // NEW: Ubah nama/satuan item yang sudah ada
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editUnit, setEditUnit] = useState<string>(UNIT_PRESETS[0]);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // NEW: Hapus history (rentang)
   const [rangeItemId, setRangeItemId] = useState<string>("");
   const [rangeStart, setRangeStart] = useState<string>(""); // yyyy-mm-dd
-  const [rangeEnd, setRangeEnd] = useState<string>("");     // yyyy-mm-dd
+  const [rangeEnd, setRangeEnd] = useState<string>(""); // yyyy-mm-dd
 
   // NEW: Ekspor - mode bulanan atau rentang
   const [exportMode, setExportMode] = useState<"monthly" | "range">("monthly");
@@ -50,7 +132,6 @@ export default function InventoryPage() {
   const [exportYear, setExportYear] = useState<number>(new Date().getFullYear());
   const [exportStart, setExportStart] = useState<string>("");
   const [exportEnd, setExportEnd] = useState<string>("");
-
 
   async function loadAll() {
     setLoading(true);
@@ -80,21 +161,25 @@ export default function InventoryPage() {
   async function handleAddItem(e: React.FormEvent) {
     e.preventDefault();
     if (!newItemName.trim()) return;
+    if (!newItemUnit.trim()) return alert("Satuan wajib diisi.");
     const { data, error } = await supabase
       .from("items")
-      .insert({ name: newItemName.trim(), unit: newItemUnit })
+      .insert({ name: newItemName.trim(), unit: newItemUnit.trim() })
       .select()
       .single();
     if (error) return alert(error.message);
     setItems((prev) => [...prev, data]);
     setSelectedItemId(data.id);
     setNewItemName("");
+    setNewItemUnit(UNIT_PRESETS[0]);
   }
 
   async function submitMovement(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedItemId) return alert("Pilih item dulu.");
-    if (qty <= 0) return alert("Qty harus > 0.");
+
+    const qty = parseDecimalComma(qtyInput);
+    if (!Number.isFinite(qty) || qty <= 0) return alert("Qty harus lebih dari 0 (contoh: 1,5).");
     if (direction === "out" && !reason) return alert("Alasan wajib diisi untuk barang keluar.");
 
     const payload = {
@@ -104,12 +189,39 @@ export default function InventoryPage() {
       reason: direction === "out" ? (reason as "Ke kedai" | "Keperluan pribadi") : null,
       note: note || null,
     };
+
     const { error } = await supabase.from("movements").insert(payload);
     if (error) return alert(error.message);
-
-    setQty(0);
+    setQtyInput("");
     setReason("");
     setNote("");
+    await loadAll();
+  }
+
+  // NEW: Buka modal ubah nama/satuan untuk item yang sedang dipilih di dropdown
+  function openEditForSelected() {
+    const it = items.find((i) => i.id === selectedItemId);
+    if (!it) return alert("Pilih item dulu.");
+    setEditName(it.name);
+    setEditUnit(it.unit);
+    setIsEditOpen(true);
+  }
+
+  // NEW: Simpan perubahan nama/satuan item
+  async function saveEditItem() {
+    if (!selectedItemId) return;
+    if (!editName.trim()) return alert("Nama item tidak boleh kosong.");
+    if (!editUnit.trim()) return alert("Satuan tidak boleh kosong.");
+
+    setSavingEdit(true);
+    const { error } = await supabase
+      .from("items")
+      .update({ name: editName.trim(), unit: editUnit.trim() })
+      .eq("id", selectedItemId);
+    setSavingEdit(false);
+
+    if (error) return alert(error.message);
+    setIsEditOpen(false);
     await loadAll();
   }
 
@@ -137,7 +249,7 @@ export default function InventoryPage() {
     const start = new Date(rangeStart);
     const end = new Date(rangeEnd);
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return alert("Format tanggal tidak valid.");
-    // exclusive upper bound (tambahkan 1 hari)
+
     const endExclusive = new Date(end);
     endExclusive.setDate(endExclusive.getDate() + 1);
 
@@ -170,15 +282,13 @@ export default function InventoryPage() {
     return (data as Movement[]) || [];
   }
 
-  // NEW: Ekspor Excel (Bulanan atau Rentang)
+  // NEW: Ekspor Excel (Bulanan atau Rentang) — TIDAK DIUBAH
   async function exportExcel() {
     let start: Date;
     let endExclusive: Date;
 
     if (exportMode === "monthly") {
-      // bulan 1–12; Date pakai 0–11
       start = new Date(exportYear, exportMonth - 1, 1);
-      // first day next month
       endExclusive = new Date(exportYear, exportMonth, 1);
     } else {
       if (!exportStart || !exportEnd) return alert("Isi tanggal mulai & akhir ekspor.");
@@ -191,7 +301,6 @@ export default function InventoryPage() {
 
     const rows = await fetchMovementsInRange(start.toISOString(), endExclusive.toISOString());
 
-    // siapkan data sheet
     const detail = rows.map((m) => ({
       Waktu: new Date(m.created_at).toLocaleString(),
       Item: m.items?.name ?? m.item_id,
@@ -202,7 +311,6 @@ export default function InventoryPage() {
       Catatan: m.note ?? "",
     }));
 
-    // ringkasan total per item dalam periode
     const sumPerItem = new Map<string, number>();
     for (const m of rows) {
       const key = m.items?.name ?? m.item_id;
@@ -214,7 +322,6 @@ export default function InventoryPage() {
       "Net Masuk(+) / Keluar(-)": total,
     }));
 
-    // buat workbook
     const wb = XLSX.utils.book_new();
     const wsDetail = XLSX.utils.json_to_sheet(detail);
     const wsRingkasan = XLSX.utils.json_to_sheet(ringkasan);
@@ -233,13 +340,13 @@ export default function InventoryPage() {
     <div className="max-w-6xl mx-auto p-6 space-y-8">
       <h1 className="text-2xl font-bold">Inventori Bahan Kopi</h1>
 
-      {/* RINGKASAN STOK + HAPUS ITEM */}
+      {/* RINGKASAN STOK + UBAH/HAPUS ITEM */}
       <Card>
         <CardBody>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h2 className="text-lg font-semibold">Stok Terkini</h2>
-            {/* NEW: Hapus item terpilih */}
-            <div className="flex gap-2">
+
+            <div className="flex gap-2 flex-wrap">
               <select
                 className="border rounded-md p-2"
                 value={selectedItemId}
@@ -250,6 +357,17 @@ export default function InventoryPage() {
                   <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>
                 ))}
               </select>
+
+              {/* NEW: Ubah nama/satuan item terpilih */}
+              <Button
+                color="secondary"
+                variant="flat"
+                isDisabled={!selectedItemId}
+                onPress={openEditForSelected}
+              >
+                Ubah Nama/Satuan
+              </Button>
+
               <Button
                 color="danger"
                 variant="flat"
@@ -291,7 +409,7 @@ export default function InventoryPage() {
           {/* Tambah item cepat */}
           <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
             <Input label="Nama item baru" placeholder="biji kopi arabica" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
-            <Input label="Unit" placeholder="kg / liter / pcs" value={newItemUnit} onChange={(e) => setNewItemUnit(e.target.value)} />
+            <UnitPicker label="Unit" value={newItemUnit} onChange={setNewItemUnit} />
             <div className="md:col-span-1">
               <Button type="submit" color="secondary" variant="flat">+ Tambah Item</Button>
             </div>
@@ -321,8 +439,14 @@ export default function InventoryPage() {
               </select>
             </div>
 
-            <Input type="number" label="Qty" placeholder="contoh: 1.5"
-              value={qty ? String(qty) : ""} onChange={(e) => setQty(Number(e.target.value))} />
+            <Input
+              type="text"
+              inputMode="decimal"
+              label="Qty"
+              placeholder="contoh: 1,5"
+              value={qtyInput}
+              onChange={(e) => setQtyInput(sanitizeDecimalInput(e.target.value))}
+            />
 
             {direction === "out" && (
               <div>
@@ -386,10 +510,9 @@ export default function InventoryPage() {
         </CardBody>
       </Card>
 
-      {/* NEW: HAPUS HISTORY (RENTANG) & EKSPOR EXCEL */}
+      {/* HAPUS HISTORY (RENTANG) & EKSPOR EXCEL — TIDAK DIUBAH */}
       <Card>
         <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* HAPUS HISTORY PER RENTANG */}
           <div className="space-y-3">
             <h3 className="text-lg font-semibold">Hapus History (Rentang Tanggal)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -421,10 +544,8 @@ export default function InventoryPage() {
             <p className="text-xs text-red-600">⚠️ Tindakan permanen. Pertimbangkan ekspor dulu sebelum menghapus.</p>
           </div>
 
-          {/* EKSPOR EXCEL */}
           <div className="space-y-3">
             <h3 className="text-lg font-semibold">Ekspor ke Excel</h3>
-
             <div className="flex gap-3 items-center">
               <label className="text-sm">Mode:</label>
               <select
@@ -474,6 +595,33 @@ export default function InventoryPage() {
           </div>
         </CardBody>
       </Card>
+
+      {/* NEW: Modal ubah nama/satuan item */}
+      <Modal isOpen={isEditOpen} onOpenChange={setIsEditOpen} placement="center">
+        <ModalContent>
+          <>
+            <ModalHeader>Ubah Nama & Satuan Item</ModalHeader>
+            <ModalBody className="gap-3">
+              <Input
+                label="Nama item"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+              <UnitPicker label="Satuan" value={editUnit} onChange={setEditUnit} />
+              <p className="text-xs text-default-500">
+                Mengubah satuan hanya mengubah label tampilan — stok yang sudah
+                tercatat tidak dikonversi otomatis. Cocok untuk membetulkan
+                penulisan (mis. "kg" → "Kg"), bukan untuk mengubah jenis satuan
+                (mis. dari Kg ke Liter).
+              </p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="light" onPress={() => setIsEditOpen(false)}>Batal</Button>
+              <Button color="primary" isLoading={savingEdit} onPress={saveEditItem}>Simpan</Button>
+            </ModalFooter>
+          </>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }
